@@ -1,6 +1,17 @@
 node_modules/
-dist/
+packages/*/node_modules/
+
+# MCP server build
+packages/mcp-server/dist/
+
+# Next.js
+packages/dashboard/.next/
+packages/dashboard/out/
+
+# DB
 *.db
 *.db-shm
 *.db-wal
+
 .env
+.env.local

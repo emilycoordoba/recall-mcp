@@ -1,20 +1,14 @@
 {
-  "name": "recall-mcp",
+  "name": "recall",
   "version": "1.0.0",
-  "type": "module",
-  "main": "dist/index.js",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsc && node dist/index.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.10.2",
-    "better-sqlite3": "^11.9.1"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.8.3"
+    "build:mcp": "npm run build -w @recall/mcp-server",
+    "build:dashboard": "npm run build -w @recall/dashboard",
+    "dev:dashboard": "npm run dev -w @recall/dashboard",
+    "start:dashboard": "npm run start -w @recall/dashboard"
   }
 }
