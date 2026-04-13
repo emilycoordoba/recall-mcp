@@ -4,7 +4,7 @@ Sistema de active recall personal. Un MCP server que se conecta a Claude Desktop
 
 ## Cómo funciona
 
-Claude Desktop explica algo → genera una tabla de contenido → te pregunta qué recuerdas → evalúa tu respuesta → guarda el resultado. Con el tiempo puedes ver qué temas dominas y cuáles necesitas repasar.
+Claude Desktop explica algo → genera una tabla de contenido sin mostrarte, la guarda en la BD, es la fuente de verdad para comparar lo que tu recuerdas → te pregunta qué recuerdas → evalúa tu respuesta → guarda el resultado. Con el tiempo puedes ver qué temas dominas y cuáles necesitas repasar.
 
 ## Estructura
 
