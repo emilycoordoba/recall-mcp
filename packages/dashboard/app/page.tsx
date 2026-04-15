@@ -15,7 +15,7 @@ type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc"
 
 function formatDate(iso: string | null) {
   if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("es-ES", {
+  return new Date(iso + "Z").toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",

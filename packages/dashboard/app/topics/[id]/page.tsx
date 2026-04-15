@@ -14,7 +14,7 @@ import {
 import { IconArrowLeft, IconCheck, IconX } from "@tabler/icons-react"
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
+  return new Date(iso + "Z").toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",
