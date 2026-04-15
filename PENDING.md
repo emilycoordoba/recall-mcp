@@ -1,5 +1,15 @@
 # Pendientes
 
+## get_review_queue
+- Devuelve los topics que "toca repasar" según score y días desde el último recall
+- La lógica de intervalos (cuántos días esperar según score) la define Emily
+- Ordenar por urgencia (más atrasado / peor score primero)
+- Base para spaced repetition proactivo desde Claude Desktop
+
+## get_stats
+- Resumen global: total topics, promedio de scores, topics con score < 3, racha de días
+- Para que Claude pueda dar un panorama sin leer topic por topic
+
 ## Búsqueda semántica con embeddings
 - Reemplazar `find_topic` por búsqueda semántica para detectar topics relacionados aunque tengan nombres distintos (ej: "np.dot" → "Producto punto")
 - Requiere modelo de embeddings local o via API

@@ -5,6 +5,10 @@ import db, {
   saveRecall,
   saveTopicSubsections,
   updateSubsectionName,
+  updateTopic,
+  deleteRecall,
+  mergeTopics,
+  deleteTopic,
   getTopicByName,
   getTopicHistory,
   findTopics,
@@ -215,6 +219,78 @@ server.tool(
   },
   async ({ topic_name, old_name, new_name }) => {
     const result = updateSubsectionName(topic_name, old_name, new_name);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: update_topic ───────────────────────────────────────────────────────
+
+server.tool(
+  "update_topic",
+  "Renombra un topic y/o lo mueve a otro grupo. Usar cuando el nombre quedó mal o el topic pertenece a otro grupo.",
+  {
+    topic_name: z.string().describe("Nombre actual del topic"),
+    new_name:   z.string().optional().describe("Nuevo nombre. Omitir si solo se cambia el grupo."),
+    group_name: z.string().nullable().optional().describe("Nuevo grupo. Pasar null para quitar el grupo."),
+  },
+  async ({ topic_name, new_name, group_name }) => {
+    const result = updateTopic(topic_name, { new_name, group_name });
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: delete_recall ──────────────────────────────────────────────────────
+
+server.tool(
+  "delete_recall",
+  "Borra una sesión de recall específica (por ID). Usar cuando el recall fue interrumpido o el score quedó incorrecto.",
+  {
+    recall_id: z.number().int().describe("ID del recall a borrar (visible en get_topic)"),
+  },
+  async ({ recall_id }) => {
+    const result = deleteRecall(recall_id);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: merge_topics ───────────────────────────────────────────────────────
+
+server.tool(
+  "merge_topics",
+  "Fusiona dos topics en uno: mueve todos los recalls del topic origen al destino y lo elimina. " +
+  "Usar cuando el mismo concepto fue guardado con dos nombres distintos (ej: 'np.dot' y 'Producto punto').",
+  {
+    source_topic: z.string().describe("Topic a eliminar (sus recalls se mueven al destino)"),
+    target_topic: z.string().describe("Topic que absorbe al origen y queda como definitivo"),
+  },
+  async ({ source_topic, target_topic }) => {
+    const result = mergeTopics(source_topic, target_topic);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: delete_topic ───────────────────────────────────────────────────────
+
+server.tool(
+  "delete_topic",
+  "Borra un topic y TODO su historial (subsecciones, recalls, scores). Acción irreversible — confirmar con el usuario antes de llamar.",
+  {
+    topic_name: z.string().describe("Nombre exacto del topic a borrar"),
+  },
+  async ({ topic_name }) => {
+    const result = deleteTopic(topic_name);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       isError: !result.success,

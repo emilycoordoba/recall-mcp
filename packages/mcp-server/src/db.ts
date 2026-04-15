@@ -281,6 +281,92 @@ export function listTopics(groupName?: string) {
     .all();
 }
 
+/** Renombra un topic y/o lo mueve a otro grupo */
+export function updateTopic(topicName: string, updates: { new_name?: string; group_name?: string | null }) {
+  const topic = db
+    .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?)`)
+    .get(topicName) as { id: number } | undefined;
+
+  if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
+
+  if (updates.new_name !== undefined) {
+    const existing = db
+      .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?) AND id != ?`)
+      .get(updates.new_name, topic.id);
+    if (existing) return { success: false, error: `Ya existe un topic llamado "${updates.new_name}"` };
+    db.prepare(`UPDATE topics SET name = ? WHERE id = ?`).run(updates.new_name, topic.id);
+  }
+
+  if (updates.group_name !== undefined) {
+    let groupId: number | null = null;
+    if (updates.group_name !== null) {
+      db.prepare(`INSERT OR IGNORE INTO topic_groups (name) VALUES (?)`).run(updates.group_name);
+      const g = db.prepare(`SELECT id FROM topic_groups WHERE name = ?`).get(updates.group_name) as { id: number };
+      groupId = g.id;
+    }
+    db.prepare(`UPDATE topics SET group_id = ? WHERE id = ?`).run(groupId, topic.id);
+  }
+
+  return { success: true, topic_id: topic.id };
+}
+
+/** Borra un recall y sus recall_subsections (CASCADE) */
+export function deleteRecall(recallId: number) {
+  const recall = db
+    .prepare(`SELECT id, topic_id FROM recalls WHERE id = ?`)
+    .get(recallId) as { id: number; topic_id: number } | undefined;
+
+  if (!recall) return { success: false, error: `Recall #${recallId} no encontrado` };
+
+  db.prepare(`DELETE FROM recalls WHERE id = ?`).run(recallId);
+  return { success: true, deleted_recall_id: recallId, topic_id: recall.topic_id };
+}
+
+/** Fusiona source_topic en target_topic: mueve recalls y subsecciones nuevas, luego borra el source */
+export const mergeTopics = db.transaction((sourceName: string, targetName: string) => {
+  const source = db
+    .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?)`)
+    .get(sourceName) as { id: number } | undefined;
+  const target = db
+    .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?)`)
+    .get(targetName) as { id: number } | undefined;
+
+  if (!source) return { success: false, error: `Topic origen "${sourceName}" no encontrado` };
+  if (!target) return { success: false, error: `Topic destino "${targetName}" no encontrado` };
+  if (source.id === target.id) return { success: false, error: "Origen y destino son el mismo topic" };
+
+  // Mover recalls al topic destino
+  db.prepare(`UPDATE recalls SET topic_id = ? WHERE topic_id = ?`).run(target.id, source.id);
+
+  // Agregar subsecciones del source que no existan en el target
+  const targetCount = (db.prepare(`SELECT COUNT(*) as c FROM topic_subsections WHERE topic_id = ?`).get(target.id) as { c: number }).c;
+  const sourceSubs = db.prepare(`SELECT name FROM topic_subsections WHERE topic_id = ? ORDER BY order_index`).all(source.id) as { name: string }[];
+
+  sourceSubs.forEach((sub, i) => {
+    db.prepare(`INSERT OR IGNORE INTO topic_subsections (topic_id, name, order_index) VALUES (?, ?, ?)`)
+      .run(target.id, sub.name, targetCount + i);
+  });
+
+  // Borrar el topic fuente (CASCADE elimina sus topic_subsections huérfanas)
+  db.prepare(`DELETE FROM topics WHERE id = ?`).run(source.id);
+
+  return { success: true, merged_into: targetName, recalls_moved: sourceSubs.length };
+});
+
+/** Borra un topic y todo su historial (CASCADE: subsecciones, recalls, recall_subsections) */
+export function deleteTopic(topicName: string) {
+  const topic = db
+    .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?)`)
+    .get(topicName) as { id: number } | undefined;
+
+  if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
+
+  const recallCount = (db.prepare(`SELECT COUNT(*) as c FROM recalls WHERE topic_id = ?`).get(topic.id) as { c: number }).c;
+  db.prepare(`DELETE FROM topics WHERE id = ?`).run(topic.id);
+
+  return { success: true, deleted_topic: topicName, recalls_deleted: recallCount };
+}
+
 /** Filtra y ordena topics por criterio */
 export function filterTopics(
   sortBy: "score_asc" | "score_desc" | "date_asc" | "date_desc" | "name",
