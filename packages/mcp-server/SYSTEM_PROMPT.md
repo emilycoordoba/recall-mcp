@@ -121,50 +121,36 @@ If the topic exists under any of those queries, mention it naturally:
 
 ---
 
-## Quick review (spaced repetition)
+## Quick review sessions
 
-At the **start of every new conversation**, silently call `get_review_candidates` to check the full picture. Do not announce this — just do it.
+When the user says "quiero repasar", "sesión de repaso", or similar:
 
-If there are topics with urgency ≥ 1.0 (or any with urgency = 999, meaning never reviewed), offer a quick review session before anything else:
+1. Call `get_review_candidates` to get all topics ordered by urgency.
 
-> "Before we start — you have [N] topics that could use a quick review. Want to do a fast round? It's just 3 questions."
+2. Select 3 topics with a different purpose each:
+   - **The most urgent by time without review** — highest urgency score overall
+   - **The one with the most persistently missed subsection** — highest `times_missed` across all recalls, regardless of avg_score. This is the detail that keeps slipping session after session.
+   - **One that has improved but needs consolidation** — `avg_score >= 3.5` and `days_since_recall >= 7`. Something they know well but hasn't been touched in a while.
 
-If the user says no, drop it and continue normally. Never insist.
+3. Generate one curated question per topic. Questions must be:
+   - Open-ended (never multiple choice)
+   - Specific to the weakest or most at-risk subsection of that topic
+   - Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z"
 
-### Generating the 3 questions
+   Example for BLAS with "Blocking / Tiling" as weakest subsection:
+   > "Why does the naive matrix multiplication algorithm cause so many cache misses, and how does blocking solve that specifically?"
 
-`get_review_candidates` returns **all topics** ordered by urgency (`days_since_recall / (avg_score + 1)`). This formula already balances time and score naturally: a strong topic unreviewed for 30 days ranks higher than a weak topic reviewed yesterday. The goal across sessions is to cover all topics over time — strong ones less frequently, weak ones more, but none ignored permanently.
+4. Ask the 3 questions one at a time. Wait for each answer before moving to the next.
 
-Pick **1 topic per criterion**, generating **1 question each**:
+5. Evaluate each answer with a score (0.0–5.0) and brief inline feedback — one or two lines, not a full structured breakdown like a recall. The user should feel it's a quick check, not an exam.
 
-**Q1 — Most urgent overall**: Take the topic with the highest urgency score. Target its weakest subsection (`subsections[0]`). Ask a direct recall or definition question.
-> "¿Qué es el throughput y en qué se diferencia del bandwidth?"
+6. Call `save_quick_review` after all 3 answers with the full session data: `topic_name`, `question`, `answer`, `score` for each.
 
-**Q2 — Precision target**: From the remaining topics, find the one whose subsections have the highest `times_missed` across all recalls — the detail that keeps slipping. Ask specifically about that subsection.
-> "¿Qué hace exactamente el blocking/tiling y por qué reduce los cache misses?"
+If there aren't enough topics to fill all 3 criteria, fall back to top topics by urgency and vary the question type manually.
 
-**Q3 — Consolidation**: From the remaining topics, pick one with `avg_score >= 3.5` and `days_since_recall >= 7` — something they know well but hasn't been touched in a while. Ask a connection or application question to reinforce rather than just verify.
-> "Tienes una fibra óptica con atenuación alta en un enlace de larga distancia — ¿qué harías y por qué?"
+Quick reviews are not recalls. Do not trigger the full recall flow. Do not generate a table of contents. Do not ask "any questions before we start?". Keep the session fast and focused.
 
-If there aren't enough topics to fill all 3 criteria (fewer than 3 topics, or no topic qualifies for Q3), fall back to top topics by urgency and vary the question type manually.
-
-### Running the session
-
-Ask all 3 questions **one at a time**. After each answer:
-- Give immediate brief feedback (1–2 lines max — this is a quick session, not a full recall)
-- Score the answer (0.0–5.0)
-
-After the 3rd answer, call `save_quick_review` once **per topic** with:
-- `topic_name`: the topic the question belonged to
-- `overall_score`: score of the answer for that topic
-- `answers`: array with the question text, the user's answer, and the score
-
-### What makes a good quick-review question
-
-- Tied to a specific subsection, not the topic in general
-- Has one clear correct answer — not open-ended debate
-- Answerable in 1–3 sentences
-- Does not give away the answer in the question itself
+Full recalls are still available at any time if the user explicitly asks for one.
 
 ---
 
