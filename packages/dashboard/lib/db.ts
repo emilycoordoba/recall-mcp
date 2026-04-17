@@ -59,6 +59,22 @@ export interface RecallSubsectionRow {
   score: number | null
 }
 
+export interface QuickReviewRow {
+  id: number
+  topic_id: number
+  reviewed_at: string
+  overall_score: number | null
+}
+
+export interface QuickReviewAnswerRow {
+  id: number
+  session_id: number
+  subsection_name: string | null
+  question: string
+  answer: string | null
+  score: number | null
+}
+
 export function getTopics(): TopicRow[] {
   const db = getDb()
   return db
@@ -72,7 +88,7 @@ export function getTopics(): TopicRow[] {
       tg.id   AS group_id,
       tg.name AS group_name,
       last_r.overall_score   AS last_score,
-      last_r.recalled_at     AS last_recalled_at,
+      MAX(COALESCE(last_r.recalled_at, ''), COALESCE(last_qr.reviewed_at, '')) AS last_recalled_at,
       COUNT(r2.id)           AS total_recalls
     FROM topics t
     LEFT JOIN topic_groups tg ON tg.id = t.group_id
@@ -80,6 +96,9 @@ export function getTopics(): TopicRow[] {
       SELECT id FROM recalls WHERE topic_id = t.id ORDER BY recalled_at DESC LIMIT 1
     )
     LEFT JOIN recalls r2 ON r2.topic_id = t.id
+    LEFT JOIN quick_reviews last_qr ON last_qr.id = (
+      SELECT id FROM quick_reviews WHERE topic_id = t.id ORDER BY reviewed_at DESC LIMIT 1
+    )
     GROUP BY t.id
     ORDER BY t.name
   `
@@ -118,6 +137,27 @@ export function getRecalls(topicId: number): RecallRow[] {
       `SELECT * FROM recalls WHERE topic_id = ? ORDER BY recalled_at DESC`
     )
     .all(topicId) as RecallRow[]
+}
+
+export function getQuickReviews(topicId: number): QuickReviewRow[] {
+  const db = getDb()
+  return db
+    .prepare(`SELECT * FROM quick_reviews WHERE topic_id = ? ORDER BY reviewed_at DESC`)
+    .all(topicId) as QuickReviewRow[]
+}
+
+export function getQuickReviewAnswers(sessionId: number): QuickReviewAnswerRow[] {
+  const db = getDb()
+  return db
+    .prepare(`
+      SELECT qra.id, qra.session_id, ts.name AS subsection_name,
+             qra.question, qra.answer, qra.score
+      FROM quick_review_answers qra
+      LEFT JOIN topic_subsections ts ON ts.id = qra.subsection_id
+      WHERE qra.session_id = ?
+      ORDER BY qra.id
+    `)
+    .all(sessionId) as QuickReviewAnswerRow[]
 }
 
 export function getRecallSubsections(recallId: number): RecallSubsectionRow[] {

@@ -130,6 +130,51 @@ If the topic exists under any of those queries, mention it naturally:
 
 ---
 
+## Quick review (spaced repetition)
+
+At the **start of every new conversation**, silently call `get_review_candidates` to check which topics need review. Do not announce this — just do it.
+
+If there are topics with urgency ≥ 1.0 (or any with urgency = 999, meaning never reviewed), offer a quick review session before anything else:
+
+> "Before we start — you have [N] topics that could use a quick review. Want to do a fast round? It's just 3 questions."
+
+If the user says no, drop it and continue normally. Never insist.
+
+### Generating the 3 questions
+
+Take the **3 most urgent topics** from `get_review_candidates`. For each one, look at its `subsections` array (already sorted weakest first) and generate **1 question** targeting the weakest subsection.
+
+Each question must have a **different cognitive purpose**:
+
+- **Q1 — Recall**: Ask the user to explain or define the concept. No context clues.
+  > "¿Qué es el throughput y en qué se diferencia del bandwidth?"
+- **Q2 — Application**: Give a scenario and ask how the concept applies.
+  > "Tienes una fibra óptica con atenuación alta en un enlace de larga distancia — ¿qué harías?"
+- **Q3 — Connection**: Ask how this concept connects to something they also know.
+  > "¿Cómo se relaciona el blocking/tiling de BLAS con lo que sabes de cache misses?"
+
+Assign question types to topics based on the topic's `total_recalls` — topics with more recalls get harder question types (application, connection). Topics with 0–1 recalls get recall-type questions.
+
+### Running the session
+
+Ask all 3 questions **one at a time**. After each answer:
+- Give immediate brief feedback (1–2 lines max — this is a quick session, not a full recall)
+- Score the answer (0.0–5.0)
+
+After the 3rd answer, call `save_quick_review` with:
+- `topic_name`: the topic each question belonged to (one call per topic)
+- `overall_score`: average of the answers for that topic
+- `answers`: array with the question text, the user's answer, and the score
+
+### What makes a good quick-review question
+
+- Targets a specific known weak point (low `avg_score` or high `times_missed`)
+- Has one clear correct answer — not open-ended debate
+- Is answerable in 1–3 sentences
+- Does not give away the answer in the question itself
+
+---
+
 ## Groups
 
 When saving a recall, infer the group from context if it's clear:
