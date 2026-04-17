@@ -252,6 +252,64 @@ export const saveRecall = db.transaction((input: SaveRecallInput) => {
   return { recall_id: recallId, topic_id: topicId };
 });
 
+export interface ReviewCandidate {
+  topic_id: number;
+  topic_name: string;
+  group_name: string | null;
+  days_since_recall: number | null;
+  avg_score: number | null;
+  urgency: number;
+  total_recalls: number;
+  subsections: { name: string; avg_score: number | null; times_missed: number }[];
+}
+
+/** Devuelve todos los topics ordenados por urgencia de repaso.
+ *  urgency = días_sin_repasar / (avg_score + 1). Sin recalls → urgency = 999. */
+export function getReviewCandidates(groupName?: string): ReviewCandidate[] {
+  const whereClause = groupName
+    ? `AND LOWER(g.name) = LOWER('${groupName.replace(/'/g, "''")}')`
+    : "";
+
+  const topics = db.prepare(`
+    SELECT
+      t.id            AS topic_id,
+      t.name          AS topic_name,
+      g.name          AS group_name,
+      CAST((julianday('now') - julianday(MAX(r.recalled_at))) AS INTEGER) AS days_since_recall,
+      AVG(r.overall_score) AS avg_score,
+      COUNT(r.id)     AS total_recalls
+    FROM topics t
+    LEFT JOIN topic_groups g ON g.id = t.group_id
+    LEFT JOIN recalls r ON r.topic_id = t.id
+    WHERE 1=1 ${whereClause}
+    GROUP BY t.id
+  `).all() as Omit<ReviewCandidate, "urgency" | "subsections">[];
+
+  const subsectionStmt = db.prepare(`
+    SELECT
+      ts.name,
+      AVG(rs.score)                                          AS avg_score,
+      SUM(CASE WHEN rs.covered = 0 THEN 1 ELSE 0 END)       AS times_missed
+    FROM topic_subsections ts
+    LEFT JOIN recall_subsections rs ON rs.subsection_id = ts.id
+    WHERE ts.topic_id = ?
+    GROUP BY ts.id
+    ORDER BY avg_score ASC NULLS LAST
+  `);
+
+  return topics
+    .map((t) => {
+      const urgency = t.total_recalls === 0
+        ? 999
+        : (t.days_since_recall ?? 0) / ((t.avg_score ?? 0) + 1);
+
+      const subsections = subsectionStmt.all(t.topic_id) as ReviewCandidate["subsections"];
+
+      return { ...t, urgency: Math.round(urgency * 100) / 100, subsections };
+    })
+    .sort((a, b) => b.urgency - a.urgency);
+}
+
 /** Lista todos los topics con su último recall */
 export function listTopics(groupName?: string) {
   const whereClause = groupName

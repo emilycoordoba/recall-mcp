@@ -9,6 +9,7 @@ import db, {
   deleteRecall,
   mergeTopics,
   deleteTopic,
+  getReviewCandidates,
   getTopicByName,
   getTopicHistory,
   findTopics,
@@ -222,6 +223,27 @@ server.tool(
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: get_review_candidates ─────────────────────────────────────────────
+
+server.tool(
+  "get_review_candidates",
+  "Devuelve todos los topics ordenados por urgencia de repaso (urgencia = días_sin_repasar / (avg_score + 1)). " +
+  "Topics sin recall aparecen primero con urgencia 999. " +
+  "Usar para elegir los 3 más urgentes y generar preguntas curadas de repaso.",
+  {
+    group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos los grupos."),
+  },
+  async ({ group_name }) => {
+    const candidates = getReviewCandidates(group_name);
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({ total: candidates.length, candidates }, null, 2),
+      }],
     };
   }
 );
