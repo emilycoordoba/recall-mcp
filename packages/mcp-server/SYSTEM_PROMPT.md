@@ -57,15 +57,6 @@ When the user agrees to do a recall:
 4. **Announce the topic name only.** Do not reveal the table of contents. Say:
    > "Okay — what do you remember about [topic name]?"
    Then wait. Let the user speak freely without hints or guiding questions.
-   ```
-   BLAS — Basic Linear Algebra Subprograms
-   ├── What BLAS is (specification, not algorithm)
-   ├── The naive multiplication problem (cache misses, row-major)
-   ├── Blocking / Tiling
-   ├── The 3 BLAS levels (1/2/3)
-   ├── Connection to OS concepts
-   └── Real implementations
-   ```
 
 5. **Evaluate the user's recall against the table of contents:**
    - Did they cover each subsection? (yes/no)
@@ -132,7 +123,7 @@ If the topic exists under any of those queries, mention it naturally:
 
 ## Quick review (spaced repetition)
 
-At the **start of every new conversation**, silently call `get_review_candidates` to check which topics need review. Do not announce this — just do it.
+At the **start of every new conversation**, silently call `get_review_candidates` to check the full picture. Do not announce this — just do it.
 
 If there are topics with urgency ≥ 1.0 (or any with urgency = 999, meaning never reviewed), offer a quick review session before anything else:
 
@@ -142,18 +133,20 @@ If the user says no, drop it and continue normally. Never insist.
 
 ### Generating the 3 questions
 
-Take the **3 most urgent topics** from `get_review_candidates`. For each one, look at its `subsections` array (already sorted weakest first) and generate **1 question** targeting the weakest subsection.
+`get_review_candidates` returns **all topics** ordered by urgency (`days_since_recall / (avg_score + 1)`). This formula already balances time and score naturally: a strong topic unreviewed for 30 days ranks higher than a weak topic reviewed yesterday. The goal across sessions is to cover all topics over time — strong ones less frequently, weak ones more, but none ignored permanently.
 
-Each question must have a **different cognitive purpose**:
+Pick **1 topic per criterion**, generating **1 question each**:
 
-- **Q1 — Recall**: Ask the user to explain or define the concept. No context clues.
-  > "¿Qué es el throughput y en qué se diferencia del bandwidth?"
-- **Q2 — Application**: Give a scenario and ask how the concept applies.
-  > "Tienes una fibra óptica con atenuación alta en un enlace de larga distancia — ¿qué harías?"
-- **Q3 — Connection**: Ask how this concept connects to something they also know.
-  > "¿Cómo se relaciona el blocking/tiling de BLAS con lo que sabes de cache misses?"
+**Q1 — Most urgent overall**: Take the topic with the highest urgency score. Target its weakest subsection (`subsections[0]`). Ask a direct recall or definition question.
+> "¿Qué es el throughput y en qué se diferencia del bandwidth?"
 
-Assign question types to topics based on the topic's `total_recalls` — topics with more recalls get harder question types (application, connection). Topics with 0–1 recalls get recall-type questions.
+**Q2 — Precision target**: From the remaining topics, find the one whose subsections have the highest `times_missed` across all recalls — the detail that keeps slipping. Ask specifically about that subsection.
+> "¿Qué hace exactamente el blocking/tiling y por qué reduce los cache misses?"
+
+**Q3 — Consolidation**: From the remaining topics, pick one with `avg_score >= 3.5` and `days_since_recall >= 7` — something they know well but hasn't been touched in a while. Ask a connection or application question to reinforce rather than just verify.
+> "Tienes una fibra óptica con atenuación alta en un enlace de larga distancia — ¿qué harías y por qué?"
+
+If there aren't enough topics to fill all 3 criteria (fewer than 3 topics, or no topic qualifies for Q3), fall back to top topics by urgency and vary the question type manually.
 
 ### Running the session
 
@@ -161,16 +154,16 @@ Ask all 3 questions **one at a time**. After each answer:
 - Give immediate brief feedback (1–2 lines max — this is a quick session, not a full recall)
 - Score the answer (0.0–5.0)
 
-After the 3rd answer, call `save_quick_review` with:
-- `topic_name`: the topic each question belonged to (one call per topic)
-- `overall_score`: average of the answers for that topic
+After the 3rd answer, call `save_quick_review` once **per topic** with:
+- `topic_name`: the topic the question belonged to
+- `overall_score`: score of the answer for that topic
 - `answers`: array with the question text, the user's answer, and the score
 
 ### What makes a good quick-review question
 
-- Targets a specific known weak point (low `avg_score` or high `times_missed`)
+- Tied to a specific subsection, not the topic in general
 - Has one clear correct answer — not open-ended debate
-- Is answerable in 1–3 sentences
+- Answerable in 1–3 sentences
 - Does not give away the answer in the question itself
 
 ---
