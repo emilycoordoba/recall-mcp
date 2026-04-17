@@ -54,6 +54,22 @@ db.exec(`
     covered        INTEGER NOT NULL DEFAULT 0,  -- 0 = no, 1 = sí
     score          REAL
   );
+
+  CREATE TABLE IF NOT EXISTS quick_reviews (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic_id      INTEGER NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    reviewed_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    overall_score REAL
+  );
+
+  CREATE TABLE IF NOT EXISTS quick_review_answers (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id    INTEGER NOT NULL REFERENCES quick_reviews(id) ON DELETE CASCADE,
+    subsection_id INTEGER REFERENCES topic_subsections(id),
+    question      TEXT    NOT NULL,
+    answer        TEXT,
+    score         REAL
+  );
 `);
 
 export default db;
@@ -252,6 +268,47 @@ export const saveRecall = db.transaction((input: SaveRecallInput) => {
   return { recall_id: recallId, topic_id: topicId };
 });
 
+export interface QuickReviewAnswerInput {
+  subsection_name: string;
+  question: string;
+  answer: string;
+  score: number;
+}
+
+export interface SaveQuickReviewInput {
+  topic_name: string;
+  overall_score: number;
+  answers: QuickReviewAnswerInput[];
+}
+
+/** Guarda una sesión de quick review con sus preguntas, respuestas y scores */
+export const saveQuickReview = db.transaction((input: SaveQuickReviewInput) => {
+  const topic = db
+    .prepare(`SELECT id FROM topics WHERE LOWER(name) = LOWER(?)`)
+    .get(input.topic_name) as { id: number } | undefined;
+
+  if (!topic) return { success: false as const, error: `Topic "${input.topic_name}" no encontrado` };
+
+  const session = db
+    .prepare(`INSERT INTO quick_reviews (topic_id, overall_score) VALUES (?, ?)`)
+    .run(topic.id, input.overall_score);
+
+  const sessionId = session.lastInsertRowid as number;
+
+  input.answers.forEach((a) => {
+    const subsection = db
+      .prepare(`SELECT id FROM topic_subsections WHERE topic_id = ? AND LOWER(name) = LOWER(?)`)
+      .get(topic.id, a.subsection_name) as { id: number } | undefined;
+
+    db.prepare(
+      `INSERT INTO quick_review_answers (session_id, subsection_id, question, answer, score)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(sessionId, subsection?.id ?? null, a.question, a.answer, a.score);
+  });
+
+  return { success: true as const, session_id: sessionId, topic_id: topic.id };
+});
+
 export interface ReviewCandidate {
   topic_id: number;
   topic_name: string;
@@ -275,12 +332,15 @@ export function getReviewCandidates(groupName?: string): ReviewCandidate[] {
       t.id            AS topic_id,
       t.name          AS topic_name,
       g.name          AS group_name,
-      CAST((julianday('now') - julianday(MAX(r.recalled_at))) AS INTEGER) AS days_since_recall,
+      CAST((julianday('now') - julianday(
+        MAX(COALESCE(r.recalled_at, ''), COALESCE(qr.reviewed_at, ''))
+      )) AS INTEGER)  AS days_since_recall,
       AVG(r.overall_score) AS avg_score,
-      COUNT(r.id)     AS total_recalls
+      COUNT(DISTINCT r.id) AS total_recalls
     FROM topics t
     LEFT JOIN topic_groups g ON g.id = t.group_id
     LEFT JOIN recalls r ON r.topic_id = t.id
+    LEFT JOIN quick_reviews qr ON qr.topic_id = t.id
     WHERE 1=1 ${whereClause}
     GROUP BY t.id
   `).all() as Omit<ReviewCandidate, "urgency" | "subsections">[];

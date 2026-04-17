@@ -4,6 +4,7 @@ import { z } from "zod";
 import db, {
   saveRecall,
   saveTopicSubsections,
+  saveQuickReview,
   updateSubsectionName,
   updateTopic,
   deleteRecall,
@@ -223,6 +224,46 @@ server.tool(
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       isError: !result.success,
+    };
+  }
+);
+
+// ─── Tool: save_quick_review ─────────────────────────────────────────────────
+
+server.tool(
+  "save_quick_review",
+  "Guarda una sesión de quick review: 3 preguntas curadas con sus respuestas y scores. " +
+  "Distinto a save_recall — no requiere transcript libre ni tabla de contenido previa. " +
+  "Actualiza la urgencia del topic para spaced repetition.",
+  {
+    topic_name:    z.string().describe("Nombre exacto del topic"),
+    overall_score: z.number().min(0).max(5).describe("Score global de la sesión (0.0–5.0)"),
+    answers: z.array(z.object({
+      subsection_name: z.string().describe("Nombre de la subsección a la que apunta la pregunta"),
+      question:        z.string().describe("Pregunta exacta que se hizo"),
+      answer:          z.string().describe("Respuesta del usuario"),
+      score:           z.number().min(0).max(5).describe("Score de esta respuesta (0.0–5.0)"),
+    })).describe("Lista de preguntas, respuestas y scores"),
+  },
+  async (input) => {
+    const result = saveQuickReview(input);
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        isError: true,
+      };
+    }
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          success: true,
+          message: `Quick review guardado para "${input.topic_name}"`,
+          session_id: result.session_id,
+          topic_id: result.topic_id,
+          overall_score: input.overall_score,
+        }, null, 2),
+      }],
     };
   }
 );
