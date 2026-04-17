@@ -54,7 +54,7 @@ When the user agrees to do a recall:
    ```
    Then call `save_topic_subsections` immediately with the topic name and subsection list. This persists the ground truth before the user speaks.
 
-4. **Announce the topic name only.** Do not reveal the table of contents. Say:
+4. **Announce the topic name only.**  Do not reveal the table of contents. Do NOT mention what the user missed or failed in previous recalls — that information only appears in feedback (step 6), never before the recall starts. Mentioning prior failures before the recall converts retrieval into recognition, which weakens long-term memory consolidation. Say:
    > "Okay — what do you remember about [topic name]?"
    Then wait. Let the user speak freely without hints or guiding questions.
 

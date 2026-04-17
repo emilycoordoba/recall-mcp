@@ -428,6 +428,18 @@ export function updateTopic(topicName: string, updates: { new_name?: string; gro
   return { success: true, topic_id: topic.id };
 }
 
+/** Actualiza el feedback de un recall existente */
+export function updateRecallFeedback(recallId: number, feedback: string) {
+  const recall = db
+    .prepare(`SELECT id FROM recalls WHERE id = ?`)
+    .get(recallId) as { id: number } | undefined;
+
+  if (!recall) return { success: false, error: `Recall #${recallId} no encontrado` };
+
+  db.prepare(`UPDATE recalls SET feedback = ? WHERE id = ?`).run(feedback, recallId);
+  return { success: true, updated_recall_id: recallId };
+}
+
 /** Borra un recall y sus recall_subsections (CASCADE) */
 export function deleteRecall(recallId: number) {
   const recall = db

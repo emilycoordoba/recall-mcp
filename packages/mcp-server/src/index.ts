@@ -5,6 +5,7 @@ import db, {
   saveRecall,
   saveTopicSubsections,
   saveQuickReview,
+  updateRecallFeedback,
   updateSubsectionName,
   updateTopic,
   deleteRecall,
@@ -285,6 +286,24 @@ server.tool(
         type: "text",
         text: JSON.stringify({ total: candidates.length, candidates }, null, 2),
       }],
+    };
+  }
+);
+
+// ─── Tool: update_recall_feedback ────────────────────────────────────────────
+
+server.tool(
+  "update_recall_feedback",
+  "Actualiza el feedback de un recall existente. Usar cuando el feedback guardado está vacío o incompleto — por ejemplo, después de dar el feedback estructurado en la conversación.",
+  {
+    recall_id: z.number().int().describe("ID del recall a actualizar (visible en get_topic)"),
+    feedback:  z.string().describe("Texto completo del feedback estructurado"),
+  },
+  async ({ recall_id, feedback }) => {
+    const result = updateRecallFeedback(recall_id, feedback);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      isError: !result.success,
     };
   }
 );

@@ -24,6 +24,7 @@ export interface TopicRow {
   last_score: number | null
   last_recalled_at: string | null
   total_recalls: number
+  total_quick_reviews: number
 }
 
 export interface TopicDetail {
@@ -89,13 +90,15 @@ export function getTopics(): TopicRow[] {
       tg.name AS group_name,
       last_r.overall_score   AS last_score,
       MAX(COALESCE(last_r.recalled_at, ''), COALESCE(last_qr.reviewed_at, '')) AS last_recalled_at,
-      COUNT(r2.id)           AS total_recalls
+      COUNT(DISTINCT r2.id)  AS total_recalls,
+      COUNT(DISTINCT qr2.id) AS total_quick_reviews
     FROM topics t
     LEFT JOIN topic_groups tg ON tg.id = t.group_id
     LEFT JOIN recalls last_r ON last_r.id = (
       SELECT id FROM recalls WHERE topic_id = t.id ORDER BY recalled_at DESC LIMIT 1
     )
     LEFT JOIN recalls r2 ON r2.topic_id = t.id
+    LEFT JOIN quick_reviews qr2 ON qr2.topic_id = t.id
     LEFT JOIN quick_reviews last_qr ON last_qr.id = (
       SELECT id FROM quick_reviews WHERE topic_id = t.id ORDER BY reviewed_at DESC LIMIT 1
     )

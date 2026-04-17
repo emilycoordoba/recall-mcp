@@ -87,14 +87,15 @@ export default async function DashboardPage({
               <TableHead>Group</TableHead>
               <TableHead className="text-center">Last Score</TableHead>
               <TableHead>Last Recall</TableHead>
-              <TableHead className="text-right">Total Recalls</TableHead>
+              <TableHead className="text-right">Recalls</TableHead>
+              <TableHead className="text-right">Quick</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-muted-foreground"
                 >
                   No topics found
@@ -126,6 +127,9 @@ export default async function DashboardPage({
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground">
                     {topic.total_recalls}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                    {topic.total_quick_reviews || "—"}
                   </TableCell>
                 </TableRow>
               ))
