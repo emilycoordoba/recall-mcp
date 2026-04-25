@@ -38,6 +38,18 @@ export interface SaveQuickReviewInput {
   answers: QuickReviewAnswerInput[];
 }
 
+export interface Stats {
+  total_topics: number;
+  total_recalls: number;
+  total_quick_reviews: number;
+  avg_score: number | null;
+  topics_below_3: number;
+  topics_never_recalled: number;
+  study_streak_days: number;
+  last_session_date: string | null;
+  most_active_group: string | null;
+}
+
 export interface ReviewCandidate {
   topic_id: number;
   topic_name: string;
@@ -535,4 +547,81 @@ export async function deleteTopic(topicName: string) {
   await supabase.from("topics").delete().eq("id", topic.id);
 
   return { success: true, deleted_topic: topicName, recalls_deleted: count ?? 0 };
+}
+
+export async function getStats(): Promise<Stats> {
+  const [
+    { data: topics },
+    { data: recalls },
+    { data: qrs },
+  ] = await Promise.all([
+    supabase.from("topics").select("id, topic_groups(name)"),
+    supabase.from("recalls").select("topic_id, recalled_at, overall_score"),
+    supabase.from("quick_review_sessions").select("topic_id, reviewed_at"),
+  ]);
+
+  const totalTopics = topics?.length ?? 0;
+  const totalRecalls = recalls?.length ?? 0;
+  const totalQRs = qrs?.length ?? 0;
+
+  // Promedio global de scores
+  const scored = (recalls ?? []).filter((r) => r.overall_score !== null);
+  const avgScore = scored.length
+    ? Math.round(scored.reduce((s, r) => s + r.overall_score!, 0) / scored.length * 100) / 100
+    : null;
+
+  // Último score por topic → cuántos están bajo 3.0
+  const lastScoreByTopic = new Map<number, number>();
+  for (const r of [...(recalls ?? [])].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at))) {
+    if (!lastScoreByTopic.has(r.topic_id) && r.overall_score !== null)
+      lastScoreByTopic.set(r.topic_id, r.overall_score);
+  }
+  const topicsBelow3 = [...lastScoreByTopic.values()].filter((s) => s < 3.0).length;
+
+  // Topics sin ninguna sesión
+  const sessionedIds = new Set([
+    ...(recalls ?? []).map((r) => r.topic_id),
+    ...(qrs ?? []).map((q) => q.topic_id),
+  ]);
+  const topicsNeverRecalled = (topics ?? []).filter((t) => !sessionedIds.has(t.id)).length;
+
+  // Racha de días consecutivos hasta hoy
+  const allDays = new Set([
+    ...(recalls ?? []).map((r) => r.recalled_at.slice(0, 10)),
+    ...(qrs ?? []).map((q) => q.reviewed_at.slice(0, 10)),
+  ]);
+  let streak = 0;
+  const cur = new Date();
+  while (allDays.has(cur.toISOString().slice(0, 10))) {
+    streak++;
+    cur.setDate(cur.getDate() - 1);
+  }
+
+  // Última sesión
+  const allDates = [
+    ...(recalls ?? []).map((r) => r.recalled_at),
+    ...(qrs ?? []).map((q) => q.reviewed_at),
+  ].sort().reverse();
+  const lastSessionDate = allDates[0]?.slice(0, 10) ?? null;
+
+  // Grupo más activo (por número de recalls)
+  const groupCounts = new Map<string, number>();
+  for (const r of (recalls ?? [])) {
+    const topic = (topics ?? []).find((t) => t.id === r.topic_id);
+    const g = (topic?.topic_groups as { name: string } | null)?.name;
+    if (g) groupCounts.set(g, (groupCounts.get(g) ?? 0) + 1);
+  }
+  const mostActiveGroup = [...groupCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  return {
+    total_topics: totalTopics,
+    total_recalls: totalRecalls,
+    total_quick_reviews: totalQRs,
+    avg_score: avgScore,
+    topics_below_3: topicsBelow3,
+    topics_never_recalled: topicsNeverRecalled,
+    study_streak_days: streak,
+    last_session_date: lastSessionDate,
+    most_active_group: mostActiveGroup,
+  };
 }

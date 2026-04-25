@@ -7,6 +7,7 @@ import {
   listTopics,
   filterTopics,
   getReviewCandidates,
+  getStats,
   saveTopicSubsections,
   saveRecall,
   saveQuickReview,
@@ -87,6 +88,18 @@ export function createMcpServer(): McpServer {
     async ({ group_name }) => {
       const candidates = await getReviewCandidates(group_name);
       return { content: [{ type: "text", text: JSON.stringify({ total: candidates.length, candidates }, null, 2) }] };
+    },
+  );
+
+  // ─── get_stats ──────────────────────────────────────────────────────────────
+
+  server.tool(
+    "get_stats",
+    "Devuelve un resumen global del progreso: total de topics, recalls, promedio de score, topics bajo 3.0, topics nunca repasados, racha de días y grupo más activo.",
+    {},
+    async () => {
+      const stats = await getStats();
+      return { content: [{ type: "text", text: JSON.stringify(stats, null, 2) }] };
     },
   );
 

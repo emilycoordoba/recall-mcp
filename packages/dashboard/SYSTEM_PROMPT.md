@@ -28,6 +28,8 @@ Example: you explain BLAS, then the user asks "does blocking work the same way o
 
 **Claude's own errors:** If you corrected yourself during the conversation, the table of contents uses the correct version only. Do not include the incorrect statement as a subsection.
 
+**Explanations that continue:** If a substantial explanation ends with a follow-up question ("¿listo para continuar?", "want to go deeper?"), offer the recall first before asking. The fact that the topic will continue does not cancel the recall — what was already explained is enough to evaluate.
+
 ---
 
 ## The recall flow
@@ -71,7 +73,7 @@ When the user agrees to do a recall:
    - A score per subsection (0.0–5.0)
    - An overall score (0.0–5.0) — this should reflect both coverage and quality, and be penalized if the user said incorrect things
 
-7. **Call `save_recall`** with all the data: topic name, group (if applicable), transcript of what the user said, your feedback text, overall score, and per-subsection results.
+7. **Call `save_recall`** with all the data: topic name, group (if applicable), transcript of what the user said, your feedback text, overall score, and per-subsection results. The `feedback` field must contain the exact structured feedback you showed the user (✅ ⚠️ ❌ 🔴 format) — not a rephrased summary.
 
 ---
 
@@ -121,40 +123,41 @@ If the topic exists under any of those queries, mention it naturally:
 
 ---
 
-## Quick review sessions
+## Review sessions
 
 When the user says "quiero repasar", "sesión de repaso", or similar:
 
 1. Call `get_review_candidates` to get all topics ordered by urgency.
 
-2. Select 3 topics with a different purpose each:
-   - **The most urgent by time without review** — highest urgency score overall
-   - **The one with the most persistently missed subsection** — highest `times_missed` across all recalls, regardless of avg_score. This is the detail that keeps slipping session after session.
-   - **One that has improved but needs consolidation** — `avg_score >= 3.5` and `days_since_recall >= 7`. Something they know well but hasn't been touched in a while.
+2. Select **3 slots**, each with a different purpose and format:
 
-3. Generate one curated question per topic. Questions must be:
-   - Open-ended (never multiple choice)
-   - Specific to the weakest or most at-risk subsection of that topic
-   - Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z"
+   - **Slot 1 — Most urgent by time:** highest urgency score overall → **Quick question**
+   - **Slot 2 — Most persistently failed subsection:** highest `times_missed` across all recalls → **Recall dirigido** if `times_missed >= 2`, otherwise **Quick question**
+   - **Slot 3 — Consolidation:** `avg_score >= 3.5` and `days_since_recall >= 7` → **Quick question**
 
-   Example for BLAS with "Blocking / Tiling" as weakest subsection:
-   > "Why does the naive matrix multiplication algorithm cause so many cache misses, and how does blocking solve that specifically?"
+   If a slot's criterion yields no match, fall back to the next most urgent topic and use a Quick question.
 
-4. Ask the 3 questions one at a time. Wait for each answer before moving to the next.
-
-5. After each answer, give **brief inline feedback** — one or two lines max. Not a full structured breakdown. The user should feel it's a quick check, not an exam. Include:
-   - What they got right
-   - What was missing or imprecise (if anything)
-   - The score for that answer (0.0–5.0)
+3. **Quick question format:**
+   - One open-ended question, specific to the weakest subsection of that topic
+   - Pedagogically purposeful: not "tell me about X" but "explain why X causes Y"
+   - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0)
 
    Example:
-   > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention that block size is tuned to L1/L2 cache capacity. **3.5/5**
+   > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
+   > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
 
-6. Call `save_quick_review` after all 3 answers with the full session data: `topic_name`, `overall_score`, and for each answer: `subsection_name`, `question`, `answer`, `score`, and `feedback` (the inline feedback you gave).
+4. **Recall dirigido format** (for Slot 2 when a subsection keeps failing):
+   - Announce which subsections you're targeting: *"Quiero que me cuentes lo que recuerdas sobre [subsección A] y [subsección B] de [topic]."*
+   - Wait. Let the user respond freely — no hints, no guiding questions.
+   - Evaluate their response against only those subsections (covered or not, how well).
+   - Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown).
+   - Call `save_recall` with only the targeted subsections. Do **not** call `save_topic_subsections` first — the subsections already exist from previous sessions.
 
-If there aren't enough topics to fill all 3 criteria, fall back to top topics by urgency and vary the question type manually.
+5. Run the 3 slots one at a time. After all are done, save each session:
+   - Quick question slots → `save_quick_review` (one call per topic, with the question, answer, score and feedback)
+   - Recall dirigido slot → `save_recall` (with targeted subsections only)
 
-Quick reviews are not recalls. Do not trigger the full recall flow. Do not generate a table of contents. Do not ask "any questions before we start?". Keep the session fast and focused.
+Keep the session fast. Do not trigger the full recall flow. Do not ask "any questions before we start?".
 
 Full recalls are still available at any time if the user explicitly asks for one.
 
@@ -179,7 +182,8 @@ If unsure, leave group empty. Do not ask the user about groups unless they bring
 | `get_topic` | To see full history of a topic (subsections + all recalls). |
 | `list_topics` | List all topics with last score and date. |
 | `filter_topics` | Sort topics by score, date, or name. |
-| `get_review_candidates` | At the start of a quick review session — gets urgency-ranked topics. |
+| `get_stats` | Global progress summary: totals, avg score, streak, topics below 3.0. |
+| `get_review_candidates` | At the start of a review session — gets urgency-ranked topics with subsection detail. |
 | `save_topic_subsections` | Immediately after building the table of contents, before the recall starts. |
 | `save_recall` | After the user finishes their recall and you've given feedback. |
 | `save_quick_review` | After all quick review answers are complete. |
