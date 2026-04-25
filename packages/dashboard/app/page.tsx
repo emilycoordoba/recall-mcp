@@ -33,27 +33,28 @@ function daysSince(iso: string | null): number | null {
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground">—</span>
-  const variant =
-    score >= 4.0 ? "default" : score >= 3.0 ? "secondary" : "destructive"
-  return <Badge variant={variant}>{score.toFixed(1)}</Badge>
+  if (score >= 4.0)
+    return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-transparent">{score.toFixed(1)}</Badge>
+  if (score >= 3.0)
+    return <Badge variant="secondary">{score.toFixed(1)}</Badge>
+  return <Badge variant="destructive">{score.toFixed(1)}</Badge>
 }
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ group?: string; sort?: string }>
+  searchParams: Promise<{ group?: string; sort?: string; search?: string }>
 }) {
-  const { group, sort } = await searchParams
+  const { group, sort, search } = await searchParams
   const allTopics = await getTopics()
 
   const groups = Array.from(
     new Set(allTopics.map((t) => t.group_name).filter(Boolean))
   ) as string[]
 
-  const filtered =
-    group && group !== "all"
-      ? allTopics.filter((t) => t.group_name === group)
-      : allTopics
+  const filtered = allTopics
+    .filter((t) => !group || group === "all" || t.group_name === group)
+    .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
 
   const sortKey = (sort ?? "name") as SortKey
   const sorted = [...filtered].sort((a, b) => {
@@ -86,7 +87,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      <DashboardFilters groups={groups} currentGroup={group} currentSort={sort} />
+      <DashboardFilters groups={groups} currentGroup={group} currentSort={sort} currentSearch={search} />
 
       <div className="mt-6 overflow-hidden rounded-lg ring-1 ring-border">
         <Table>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 import {
   Select,
   SelectContent,
@@ -13,14 +14,17 @@ interface Props {
   groups: string[]
   currentGroup?: string
   currentSort?: string
+  currentSearch?: string
 }
 
-export function DashboardFilters({ groups, currentGroup, currentSort }: Props) {
+export function DashboardFilters({ groups, currentGroup, currentSort, currentSearch }: Props) {
   const router = useRouter()
+  const [search, setSearch] = useState(currentSearch ?? "")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function update(key: "group" | "sort", value: string) {
+  function update(key: "group" | "sort" | "search", value: string) {
     const params = new URLSearchParams(window.location.search)
-    if (value === "all" || value === "name") {
+    if (!value || value === "all" || value === "name") {
       params.delete(key)
     } else {
       params.set(key, value)
@@ -28,8 +32,24 @@ export function DashboardFilters({ groups, currentGroup, currentSort }: Props) {
     router.push(`/?${params.toString()}`)
   }
 
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      update("search", search)
+    }, 300)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [search])
+
   return (
     <div className="flex flex-wrap gap-3">
+      <input
+        type="search"
+        placeholder="Buscar topic…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="h-9 w-56 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+
       <Select
         value={currentGroup ?? "all"}
         onValueChange={(v) => update("group", v)}
