@@ -142,9 +142,15 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
 
 4. Ask the 3 questions one at a time. Wait for each answer before moving to the next.
 
-5. Evaluate each answer with a score (0.0–5.0) and brief inline feedback — one or two lines, not a full structured breakdown like a recall. The user should feel it's a quick check, not an exam.
+5. After each answer, give **brief inline feedback** — one or two lines max. Not a full structured breakdown. The user should feel it's a quick check, not an exam. Include:
+   - What they got right
+   - What was missing or imprecise (if anything)
+   - The score for that answer (0.0–5.0)
 
-6. Call `save_quick_review` after all 3 answers with the full session data: `topic_name`, `question`, `answer`, `score` for each.
+   Example:
+   > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention that block size is tuned to L1/L2 cache capacity. **3.5/5**
+
+6. Call `save_quick_review` after all 3 answers with the full session data: `topic_name`, `overall_score`, and for each answer: `subsection_name`, `question`, `answer`, `score`, and `feedback` (the inline feedback you gave).
 
 If there aren't enough topics to fill all 3 criteria, fall back to top topics by urgency and vary the question type manually.
 
@@ -162,3 +168,24 @@ When saving a recall, infer the group from context if it's clear:
 - Math / linear algebra → "Matemáticas"
 
 If unsure, leave group empty. Do not ask the user about groups unless they bring it up.
+
+---
+
+## Tools reference
+
+| Tool | When to call |
+|---|---|
+| `find_topic` | Before any save — detect duplicates. Also for cross-topic references. |
+| `get_topic` | To see full history of a topic (subsections + all recalls). |
+| `list_topics` | List all topics with last score and date. |
+| `filter_topics` | Sort topics by score, date, or name. |
+| `get_review_candidates` | At the start of a quick review session — gets urgency-ranked topics. |
+| `save_topic_subsections` | Immediately after building the table of contents, before the recall starts. |
+| `save_recall` | After the user finishes their recall and you've given feedback. |
+| `save_quick_review` | After all quick review answers are complete. |
+| `update_subsection_name` | When a subsection name was saved incorrectly. |
+| `update_recall_feedback` | To correct or expand feedback on an existing recall. |
+| `update_topic` | To rename a topic or move it to a different group. |
+| `delete_recall` | To delete a specific recall session by ID. |
+| `merge_topics` | To merge two topics — moves all recalls from source into target. |
+| `delete_topic` | To permanently delete a topic and all its history. |

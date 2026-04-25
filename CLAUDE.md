@@ -7,20 +7,22 @@ Sistema de active recall personal. Claude Desktop explica temas, el usuario hace
 ```
 recall-mcp/
 ├── packages/
-│   ├── mcp-server/   — MCP server Node/TypeScript (se conecta a Claude Desktop)
-│   └── dashboard/    — Frontend Next.js (visualiza el progreso)
+│   ├── mcp-server/   — MCP server legacy (stdio + SQLite). YA NO SE USA.
+│   └── dashboard/    — Next.js: frontend + MCP server HTTP + Supabase
 ├── package.json      — workspace root (npm workspaces)
 └── CLAUDE.md
 ```
 
-## Comandos desde la raíz
+## Arquitectura actual
 
-```bash
-npm install                  # instala todo (hoista dependencias compartidas)
-npm run build:mcp            # compilar el MCP server
-npm run dev:dashboard        # correr Next.js en dev (puerto 3000)
-npm run start:dashboard      # correr Next.js en producción (0.0.0.0)
 ```
+Claude Desktop ──HTTP──▶ Vercel (/api/mcp) ──▶ Supabase ◀── Dashboard (lectura)
+```
+
+- El MCP server vive en `packages/dashboard/pages/api/mcp.ts` (HTTP, Streamable MCP)
+- La lógica de tools está en `packages/dashboard/lib/mcp-server.ts`
+- Las queries a Supabase están en `packages/dashboard/lib/db-mcp.ts` (escritura) y `lib/db.ts` (lectura dashboard)
+- `packages/mcp-server/` es código legacy (stdio + SQLite), no se usa
 
 ## Cómo funciona el sistema
 
@@ -33,7 +35,13 @@ Claude Desktop explica algo
   → dashboard visualiza el progreso
 ```
 
-El MCP server escribe en `~/.recall-mcp/recall.db`. El dashboard la lee en modo readonly.
+## Comandos desde la raíz
+
+```bash
+npm install                  # instala todo
+npm run dev:dashboard        # dev server (puerto 3000)
+npm run start:dashboard      # producción en 0.0.0.0
+```
 
 ## Configuración Claude Desktop
 
@@ -43,19 +51,22 @@ El MCP server escribe en `~/.recall-mcp/recall.db`. El dashboard la lee en modo 
 {
   "mcpServers": {
     "recall-mcp": {
-      "command": "node",
-      "args": ["C:\\Users\\emily\\recall-mcp\\packages\\mcp-server\\dist\\index.js"]
+      "url": "<VERCEL_URL>/api/mcp",
+      "headers": { "Authorization": "Bearer <MCP_API_KEY>" }
     }
   }
 }
 ```
 
-El system prompt está en `packages/mcp-server/SYSTEM_PROMPT.md`.
+El system prompt está en `packages/dashboard/SYSTEM_PROMPT.md`.
 
-## Producción
+## Producción (Vercel)
+
+El dashboard se despliega en Vercel automáticamente. Variables de entorno necesarias:
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` — conexión a Supabase
+- `MCP_API_KEY` — token Bearer que usa Claude Desktop
+- `DASHBOARD_USER` / `DASHBOARD_PASS` — Basic auth para la UI
 
 ```bash
-npm run build:mcp                  # recompilar tras cambios al server
-pm2 restart recall-dashboard       # reiniciar dashboard
-pm2 logs recall-dashboard --lines 20
+pm2 logs recall-dashboard --lines 20   # logs si hay instancia local
 ```

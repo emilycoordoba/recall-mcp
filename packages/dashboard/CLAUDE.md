@@ -1,6 +1,8 @@
 # dashboard
 
-Frontend Next.js 16 (App Router) que visualiza el progreso de recalls. Lee la BD SQLite en modo **readonly** — no escribe nunca.
+Next.js 16 (App Router) con dos responsabilidades:
+1. **Frontend**: visualiza el progreso de recalls leyendo Supabase.
+2. **MCP server HTTP**: expone el MCP server en `/api/mcp` (Pages API, Streamable HTTP). Claude Desktop apunta aquí.
 
 ## Comandos
 
@@ -21,20 +23,17 @@ Desde la raíz del monorepo: `npm run dev:dashboard` / `npm run start:dashboard`
 |---|---|
 | `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena por score/fecha/nombre. |
 | `/topics/[id]` | Detalle de un topic: subsecciones canónicas + historial completo de recalls con breakdown por subsección. |
-
-## API Routes
-
-```
-app/api/topics/route.ts         GET /api/topics       → lista de topics
-app/api/topics/[id]/route.ts    GET /api/topics/:id   → detalle + recalls
-```
-
-Ambas tienen `export const dynamic = "force-dynamic"` porque leen SQLite directamente (no hay caché de datos).
+| `/api/mcp` (Pages API) | MCP server HTTP — Claude Desktop apunta aquí con Bearer token |
+| `/api/oauth/*` | Endpoints OAuth para autenticación del MCP server |
 
 ## Archivos clave
 
 ```
-lib/db.ts                      — conexión readonly a ~/.recall-mcp/recall.db + queries
+pages/api/mcp.ts               — endpoint MCP HTTP (Streamable, Pages API)
+lib/mcp-server.ts              — definición de tools MCP (usa db-mcp.ts)
+lib/db-mcp.ts                  — queries de escritura a Supabase (save_recall, etc.)
+lib/db.ts                      — queries de lectura a Supabase (dashboard)
+lib/supabase.ts                — cliente Supabase compartido
 app/page.tsx                   — página principal (Server Component)
 app/topics/[id]/page.tsx       — detalle del topic (Server Component)
 components/dashboard-filters.tsx — filtros de grupo y sort (Client Component)
@@ -43,13 +42,11 @@ components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table
 
 ## Gotchas
 
-**La BD es externa al repo** — vive en `~/.recall-mcp/recall.db`. Si no existe (MCP server nunca corrió), la app lanza error al arrancar.
+**Dos libs de DB separadas por intención**: `lib/db.ts` es solo lectura (dashboard), `lib/db-mcp.ts` es escritura (MCP tools). Mantenerlas separadas evita exponer operaciones de escritura desde el frontend.
 
-**Conexión singleton con lazy init** — `lib/db.ts` usa un singleton `_db` que se inicializa en el primer request, no al arrancar el servidor. Esto evita crash en build time cuando la BD no existe.
+**`/api/mcp` usa Pages API, no App Router** — el Streamable HTTP transport del MCP SDK necesita acceso al request/response crudos sin el body parser de Next.js. App Router no lo soporta bien.
 
-**Las páginas son Server Components** — leen la BD directamente con `better-sqlite3` (síncrono), sin fetch a la API. Las API routes existen para uso externo/futuro.
-
-**Sorting del lado del cliente** — la página principal recibe `searchParams` y ordena en el Server Component, no en el cliente. `DashboardFilters` solo actualiza los query params via router.
+**Sorting del lado del servidor** — la página principal recibe `searchParams` y ordena en el Server Component. `DashboardFilters` solo actualiza los query params via router.
 
 ## Stack
 
