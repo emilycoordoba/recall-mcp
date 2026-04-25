@@ -1,7 +1,16 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import Link from "next/link"
+import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   Select,
   SelectContent,
@@ -9,79 +18,152 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import type { TopicRow } from "@/lib/db"
 
-interface Props {
-  groups: string[]
-  currentGroup?: string
-  currentSort?: string
-  currentSearch?: string
+type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc"
+
+function formatDate(iso: string | null) {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-export function DashboardFilters({ groups, currentGroup, currentSort, currentSearch }: Props) {
-  const router = useRouter()
-  const [search, setSearch] = useState(currentSearch ?? "")
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000)
+}
 
-  function update(key: "group" | "sort" | "search", value: string) {
-    const params = new URLSearchParams(window.location.search)
-    if (!value || value === "all" || value === "name") {
-      params.delete(key)
-    } else {
-      params.set(key, value)
-    }
-    router.push(`/?${params.toString()}`)
-  }
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score === null) return <span className="text-muted-foreground">—</span>
+  if (score >= 4.0)
+    return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-transparent">{score.toFixed(1)}</Badge>
+  if (score >= 3.0)
+    return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-transparent">{score.toFixed(1)}</Badge>
+  return <Badge variant="destructive">{score.toFixed(1)}</Badge>
+}
 
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      update("search", search)
-    }, 300)
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [search])
+interface Props {
+  topics: TopicRow[]
+  groups: string[]
+}
+
+export function DashboardFilters({ topics, groups }: Props) {
+  const [search, setSearch] = useState("")
+  const [group, setGroup] = useState("all")
+  const [sort, setSort] = useState<SortKey>("name")
+
+  const filtered = topics
+    .filter((t) => group === "all" || t.group_name === group)
+    .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      switch (sort) {
+        case "score_asc":  return (a.last_score ?? -1) - (b.last_score ?? -1)
+        case "score_desc": return (b.last_score ?? -1) - (a.last_score ?? -1)
+        case "date_asc":   return (a.last_recalled_at ?? "").localeCompare(b.last_recalled_at ?? "")
+        case "date_desc":  return (b.last_recalled_at ?? "").localeCompare(a.last_recalled_at ?? "")
+        default:           return a.name.localeCompare(b.name)
+      }
+    })
 
   return (
-    <div className="flex flex-wrap gap-3">
-      <input
-        type="search"
-        placeholder="Buscar topic…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="h-9 w-56 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-      />
+    <>
+      <div className="flex flex-wrap gap-3">
+        <input
+          type="search"
+          placeholder="Buscar topic…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="h-9 w-48 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
 
-      <Select
-        value={currentGroup ?? "all"}
-        onValueChange={(v) => update("group", v)}
-      >
-        <SelectTrigger className="w-48">
-          <SelectValue placeholder="All groups" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All groups</SelectItem>
-          {groups.map((g) => (
-            <SelectItem key={g} value={g}>
-              {g}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <Select value={group} onValueChange={setGroup}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All groups" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All groups</SelectItem>
+            {groups.map((g) => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <Select
-        value={currentSort ?? "name"}
-        onValueChange={(v) => update("sort", v)}
-      >
-        <SelectTrigger className="w-52">
-          <SelectValue placeholder="Sort by name" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="name">Sort: Name</SelectItem>
-          <SelectItem value="score_desc">Sort: Score ↓</SelectItem>
-          <SelectItem value="score_asc">Sort: Score ↑</SelectItem>
-          <SelectItem value="date_desc">Sort: Date ↓</SelectItem>
-          <SelectItem value="date_asc">Sort: Date ↑</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Sort by name" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Sort: Name</SelectItem>
+            <SelectItem value="score_desc">Sort: Score ↓</SelectItem>
+            <SelectItem value="score_asc">Sort: Score ↑</SelectItem>
+            <SelectItem value="date_desc">Sort: Date ↓</SelectItem>
+            <SelectItem value="date_asc">Sort: Date ↑</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-lg ring-1 ring-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Topic</TableHead>
+              <TableHead>Group</TableHead>
+              <TableHead className="text-center">Last Score</TableHead>
+              <TableHead>Last Recall</TableHead>
+              <TableHead className="text-right">Recalls</TableHead>
+              <TableHead className="text-right">Días</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                  No topics found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((topic) => {
+                const days = daysSince(topic.last_recalled_at)
+                const daysColor = days === null
+                  ? "text-muted-foreground"
+                  : days >= 14 ? "text-destructive"
+                  : days >= 7  ? "text-yellow-600 dark:text-yellow-400"
+                  : "text-muted-foreground"
+
+                return (
+                  <TableRow key={topic.id}>
+                    <TableCell>
+                      <Link href={`/topics/${topic.id}`} className="font-medium underline-offset-4 hover:underline">
+                        {topic.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {topic.group_name
+                        ? <Badge variant="outline">{topic.group_name}</Badge>
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <ScoreBadge score={topic.last_score} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDate(topic.last_recalled_at)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs text-muted-foreground">
+                      {topic.total_recalls}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      <span className={daysColor}>{days !== null ? `${days}d` : "—"}</span>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   )
 }
