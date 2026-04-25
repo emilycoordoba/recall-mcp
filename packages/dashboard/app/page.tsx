@@ -35,7 +35,7 @@ export default async function DashboardPage({
   searchParams: Promise<{ group?: string; sort?: string }>
 }) {
   const { group, sort } = await searchParams
-  const allTopics = getTopics()
+  const allTopics = await getTopics()
 
   const groups = Array.from(
     new Set(allTopics.map((t) => t.group_name).filter(Boolean))

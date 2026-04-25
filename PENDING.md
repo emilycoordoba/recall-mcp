@@ -1,5 +1,10 @@
 # Pendientes
 
+## Vista global de historial (dashboard)
+- Página `/history` que muestre todos los recalls de todos los topics en orden cronológico
+- Tipo "qué estudié el 12 de abril" — línea de tiempo global
+- Cada entrada: topic, score, fecha, link al detalle
+
 ## get_review_queue
 - Devuelve los topics que "toca repasar" según score y días desde el último recall
 - La lógica de intervalos (cuántos días esperar según score) la define Emily

@@ -39,22 +39,29 @@ export default async function TopicPage({
   const topicId = parseInt(id, 10)
   if (isNaN(topicId)) notFound()
 
-  const topic = getTopic(topicId)
+  const [topic, subsections, rawRecalls, rawQuickReviews] = await Promise.all([
+    getTopic(topicId),
+    getSubsections(topicId),
+    getRecalls(topicId),
+    getQuickReviews(topicId),
+  ])
   if (!topic) notFound()
 
-  const subsections = getSubsections(topicId)
+  const recalls = await Promise.all(
+    rawRecalls.map(async (recall) => ({
+      type: "recall" as const,
+      date: recall.recalled_at,
+      data: { ...recall, subsections: await getRecallSubsections(recall.id) },
+    })),
+  )
 
-  const recalls = getRecalls(topicId).map((recall) => ({
-    type: "recall" as const,
-    date: recall.recalled_at,
-    data: { ...recall, subsections: getRecallSubsections(recall.id) },
-  }))
-
-  const quickReviews = getQuickReviews(topicId).map((qr) => ({
-    type: "quick" as const,
-    date: qr.reviewed_at,
-    data: { ...qr, answers: getQuickReviewAnswers(qr.id) },
-  }))
+  const quickReviews = await Promise.all(
+    rawQuickReviews.map(async (qr) => ({
+      type: "quick" as const,
+      date: qr.reviewed_at,
+      data: { ...qr, answers: await getQuickReviewAnswers(qr.id) },
+    })),
+  )
 
   const sessions = [...recalls, ...quickReviews].sort((a, b) =>
     b.date.localeCompare(a.date)

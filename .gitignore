@@ -18,3 +18,5 @@ packages/dashboard/out/
 
 # Claude Code
 .claude/
+
+.vercel

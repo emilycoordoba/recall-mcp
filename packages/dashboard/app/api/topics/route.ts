@@ -3,9 +3,9 @@ import { getTopics } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
-export function GET() {
+export async function GET() {
   try {
-    const topics = getTopics()
+    const topics = await getTopics()
     return NextResponse.json(topics)
   } catch (err) {
     console.error(err)

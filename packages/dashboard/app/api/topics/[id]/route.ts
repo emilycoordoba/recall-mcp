@@ -14,16 +14,22 @@ export async function GET(
       return NextResponse.json({ error: "Invalid id" }, { status: 400 })
     }
 
-    const topic = getTopic(topicId)
+    const topic = await getTopic(topicId)
     if (!topic) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
-    const subsections = getSubsections(topicId)
-    const recalls = getRecalls(topicId).map((recall) => ({
-      ...recall,
-      subsections: getRecallSubsections(recall.id),
-    }))
+    const [subsections, rawRecalls] = await Promise.all([
+      getSubsections(topicId),
+      getRecalls(topicId),
+    ])
+
+    const recalls = await Promise.all(
+      rawRecalls.map(async (recall) => ({
+        ...recall,
+        subsections: await getRecallSubsections(recall.id),
+      })),
+    )
 
     return NextResponse.json({ topic, subsections, recalls })
   } catch (err) {
