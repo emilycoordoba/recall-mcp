@@ -7,6 +7,7 @@ import {
   listTopics,
   filterTopics,
   getReviewCandidates,
+  getReviewPlan,
   getStats,
   saveTopicSubsections,
   saveRecall,
@@ -83,11 +84,23 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "get_review_candidates",
-    "Devuelve todos los topics ordenados por urgencia de repaso (urgencia = días_sin_repasar / (avg_score + 1)). Topics sin recall → urgencia 999.",
+    "Devuelve todos los topics ordenados por urgencia (urgencia = días_sin_repasar / (avg_score + 1)). Usar para exploración. Para sesiones de repaso usar get_review_plan.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
       const candidates = await getReviewCandidates(group_name);
       return { content: [{ type: "text", text: JSON.stringify({ total: candidates.length, candidates }, null, 2) }] };
+    },
+  );
+
+  // ─── get_review_plan ────────────────────────────────────────────────────────
+
+  server.tool(
+    "get_review_plan",
+    "Genera el plan de la sesión de repaso: 3 slots con topic, formato (quick / recall_dirigido) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso.",
+    { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
+    async ({ group_name }) => {
+      const plan = await getReviewPlan(group_name);
+      return { content: [{ type: "text", text: JSON.stringify(plan, null, 2) }] };
     },
   );
 

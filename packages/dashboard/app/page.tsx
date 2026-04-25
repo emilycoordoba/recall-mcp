@@ -1,11 +1,11 @@
 import Link from "next/link"
-import { getTopics } from "@/lib/db"
+import { getTopics, getStudyStreak } from "@/lib/db"
 import { DashboardFilters } from "@/components/dashboard-filters"
 
 export const revalidate = 30
 
 export default async function DashboardPage() {
-  const topics = await getTopics()
+  const [topics, streak] = await Promise.all([getTopics(), getStudyStreak()])
   const groups = Array.from(
     new Set(topics.map((t) => t.group_name).filter(Boolean))
   ) as string[]
@@ -19,9 +19,16 @@ export default async function DashboardPage() {
             {topics.length} topics · {groups.length} groups
           </p>
         </div>
-        <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-          Historial →
-        </Link>
+        <div className="flex items-center gap-4">
+          {streak > 0 && (
+            <span className="text-sm font-medium text-orange-500">
+              🔥 {streak} {streak === 1 ? "día" : "días"}
+            </span>
+          )}
+          <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+            Historial →
+          </Link>
+        </div>
       </div>
       <DashboardFilters topics={topics} groups={groups} />
     </div>

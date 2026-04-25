@@ -64,6 +64,26 @@ export interface QuickReviewAnswerRow {
   feedback: string | null;
 }
 
+export async function getStudyStreak(): Promise<number> {
+  const [{ data: recalls }, { data: qrs }] = await Promise.all([
+    supabase.from("recalls").select("recalled_at"),
+    supabase.from("quick_review_sessions").select("reviewed_at"),
+  ]);
+
+  const allDays = new Set([
+    ...(recalls ?? []).map((r) => r.recalled_at.slice(0, 10)),
+    ...(qrs ?? []).map((q) => q.reviewed_at.slice(0, 10)),
+  ]);
+
+  let streak = 0;
+  const cur = new Date();
+  while (allDays.has(cur.toISOString().slice(0, 10))) {
+    streak++;
+    cur.setDate(cur.getDate() - 1);
+  }
+  return streak;
+}
+
 export async function getTopics(): Promise<TopicRow[]> {
   const { data, error } = await supabase
     .from("topics")

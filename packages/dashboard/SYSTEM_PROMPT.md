@@ -127,36 +127,23 @@ If the topic exists under any of those queries, mention it naturally:
 
 When the user says "quiero repasar", "sesión de repaso", or similar:
 
-1. Call `get_review_candidates` to get all topics ordered by urgency.
+1. Call `get_review_plan` — it returns 3 slots already computed with topic, format, and target subsections.
 
-2. Select **3 slots**, each with a different purpose and format:
+2. Execute each slot in order. Two possible formats:
 
-   - **Slot 1 — Most urgent by time:** highest urgency score overall → **Quick question**
-   - **Slot 2 — Most persistently failed subsection:** highest `times_missed` across all recalls → **Recall dirigido** if `times_missed >= 2`, otherwise **Quick question**
-   - **Slot 3 — Consolidation:** `avg_score >= 3.5` and `days_since_recall >= 7` → **Quick question**
+   **Quick** (`format: "quick"`):
+   - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
+   - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0).
+   - Example: > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
 
-   If a slot's criterion yields no match, fall back to the next most urgent topic and use a Quick question.
-
-3. **Quick question format:**
-   - One open-ended question, specific to the weakest subsection of that topic
-   - Pedagogically purposeful: not "tell me about X" but "explain why X causes Y"
-   - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0)
-
-   Example:
-   > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
-   > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
-
-4. **Recall dirigido format** (for Slot 2 when a subsection keeps failing):
-   - From the selected topic, pick the **1–3 weakest subsections**: those with the highest `times_missed` and/or lowest `avg_score`. Do not include subsections that are already solid (avg_score ≥ 4.0 and times_missed = 0).
-   - Announce the targeted subsections: *"Quiero que me cuentes lo que recuerdas sobre [subsección A] y [subsección B] de [topic]."*
+   **Recall dirigido** (`format: "recall_dirigido"`):
+   - Announce the subsections from `target_subsections`: *"Cuéntame lo que recuerdas sobre [A] y [B] de [topic]."*
    - Wait. Let the user respond freely — no hints, no guiding questions.
-   - Evaluate their response against only those subsections (covered or not, how well).
-   - Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown).
-   - Call `save_recall` with only the targeted subsections. Do **not** call `save_topic_subsections` first — the subsections already exist from previous sessions.
+   - Evaluate only the targeted subsections. Brief feedback + score per subsection.
 
-5. Run the 3 slots one at a time. After all are done, save each session:
-   - Quick question slots → `save_quick_review` (one call per topic, with the question, answer, score and feedback)
-   - Recall dirigido slot → `save_recall` (with targeted subsections only)
+3. After all 3 slots, save:
+   - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)
+   - Recall dirigido slot → `save_recall` (targeted subsections only — do NOT call `save_topic_subsections` first)
 
 Keep the session fast. Do not trigger the full recall flow. Do not ask "any questions before we start?".
 
@@ -184,7 +171,8 @@ If unsure, leave group empty. Do not ask the user about groups unless they bring
 | `list_topics` | List all topics with last score and date. |
 | `filter_topics` | Sort topics by score, date, or name. |
 | `get_stats` | Global progress summary: totals, avg score, streak, topics below 3.0. |
-| `get_review_candidates` | At the start of a review session — gets urgency-ranked topics with subsection detail. |
+| `get_review_plan` | At the start of a review session — returns 3 ready-to-execute slots with format and target subsections. |
+| `get_review_candidates` | Raw urgency-ranked topic list. Use for exploration, not for review sessions. |
 | `save_topic_subsections` | Immediately after building the table of contents, before the recall starts. |
 | `save_recall` | After the user finishes their recall and you've given feedback. |
 | `save_quick_review` | After all quick review answers are complete. |

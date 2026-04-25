@@ -549,6 +549,105 @@ export async function deleteTopic(topicName: string) {
   return { success: true, deleted_topic: topicName, recalls_deleted: count ?? 0 };
 }
 
+export interface ReviewSlot {
+  slot: 1 | 2 | 3;
+  purpose: "most_urgent" | "persistent_failure" | "consolidation" | "fallback";
+  format: "quick" | "recall_dirigido";
+  topic_id: number;
+  topic_name: string;
+  group_name: string | null;
+  days_since_recall: number | null;
+  avg_score: number | null;
+  target_subsection?: string;
+  target_subsections?: string[];
+}
+
+export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; message?: string }> {
+  const candidates = await getReviewCandidates(groupName);
+  if (candidates.length === 0) return { slots: [], message: "No hay topics registrados para repasar." };
+
+  const used = new Set<number>();
+
+  function weakestQuickSubsection(c: ReviewCandidate): string {
+    const ranked = [...c.subsections].sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
+    return ranked[0]?.name ?? "general";
+  }
+
+  function weakestRecallSubsections(c: ReviewCandidate): string[] {
+    return [...c.subsections]
+      .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0 && s.times_missed === 0))
+      .sort((a, b) => b.times_missed - a.times_missed || (a.avg_score ?? 0) - (b.avg_score ?? 0))
+      .slice(0, 3)
+      .map((s) => s.name);
+  }
+
+  const slots: ReviewSlot[] = [];
+
+  // Slot 1: más urgente por tiempo
+  const s1 = candidates.find((c) => !used.has(c.topic_id));
+  if (s1) {
+    used.add(s1.topic_id);
+    slots.push({
+      slot: 1, purpose: "most_urgent", format: "quick",
+      topic_id: s1.topic_id, topic_name: s1.topic_name, group_name: s1.group_name,
+      days_since_recall: s1.days_since_recall, avg_score: s1.avg_score,
+      target_subsection: weakestQuickSubsection(s1),
+    });
+  }
+
+  // Slot 2: subsección más fallada (times_missed >= 2) → recall dirigido
+  const s2 = candidates.find((c) => !used.has(c.topic_id) && c.subsections.some((s) => s.times_missed >= 2));
+  if (s2) {
+    used.add(s2.topic_id);
+    slots.push({
+      slot: 2, purpose: "persistent_failure", format: "recall_dirigido",
+      topic_id: s2.topic_id, topic_name: s2.topic_name, group_name: s2.group_name,
+      days_since_recall: s2.days_since_recall, avg_score: s2.avg_score,
+      target_subsections: weakestRecallSubsections(s2),
+    });
+  } else {
+    const fallback = candidates.find((c) => !used.has(c.topic_id));
+    if (fallback) {
+      used.add(fallback.topic_id);
+      slots.push({
+        slot: 2, purpose: "fallback", format: "quick",
+        topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
+        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score,
+        target_subsection: weakestQuickSubsection(fallback),
+      });
+    }
+  }
+
+  // Slot 3: consolidación (bien aprendido pero sin tocar ≥7 días)
+  const s3 = candidates.find((c) =>
+    !used.has(c.topic_id) &&
+    c.avg_score !== null && c.avg_score >= 3.5 &&
+    c.days_since_recall !== null && c.days_since_recall >= 7,
+  );
+  if (s3) {
+    used.add(s3.topic_id);
+    slots.push({
+      slot: 3, purpose: "consolidation", format: "quick",
+      topic_id: s3.topic_id, topic_name: s3.topic_name, group_name: s3.group_name,
+      days_since_recall: s3.days_since_recall, avg_score: s3.avg_score,
+      target_subsection: weakestQuickSubsection(s3),
+    });
+  } else {
+    const fallback = candidates.find((c) => !used.has(c.topic_id));
+    if (fallback) {
+      used.add(fallback.topic_id);
+      slots.push({
+        slot: 3, purpose: "fallback", format: "quick",
+        topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
+        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score,
+        target_subsection: weakestQuickSubsection(fallback),
+      });
+    }
+  }
+
+  return { slots };
+}
+
 export async function getStats(): Promise<Stats> {
   const [
     { data: topics },
