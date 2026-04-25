@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import type { TopicRow } from "@/lib/db"
 
-type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc"
+type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc"
 
 function formatDate(iso: string | null) {
   if (!iso) return "—"
@@ -60,11 +60,15 @@ export function DashboardFilters({ topics, groups }: Props) {
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       switch (sort) {
-        case "score_asc":  return (a.last_score ?? -1) - (b.last_score ?? -1)
-        case "score_desc": return (b.last_score ?? -1) - (a.last_score ?? -1)
-        case "date_asc":   return (a.last_recalled_at ?? "").localeCompare(b.last_recalled_at ?? "")
-        case "date_desc":  return (b.last_recalled_at ?? "").localeCompare(a.last_recalled_at ?? "")
-        default:           return a.name.localeCompare(b.name)
+        case "score_asc":    return (a.last_score ?? -1) - (b.last_score ?? -1)
+        case "score_desc":   return (b.last_score ?? -1) - (a.last_score ?? -1)
+        case "date_asc":     return (a.last_recalled_at ?? "").localeCompare(b.last_recalled_at ?? "")
+        case "date_desc":    return (b.last_recalled_at ?? "").localeCompare(a.last_recalled_at ?? "")
+        case "days_desc":    return (daysSince(b.last_recalled_at) ?? -1) - (daysSince(a.last_recalled_at) ?? -1)
+        case "days_asc":     return (daysSince(a.last_recalled_at) ?? -1) - (daysSince(b.last_recalled_at) ?? -1)
+        case "recalls_desc": return b.total_recalls - a.total_recalls
+        case "recalls_asc":  return a.total_recalls - b.total_recalls
+        default:             return a.name.localeCompare(b.name)
       }
     })
 
@@ -76,7 +80,7 @@ export function DashboardFilters({ topics, groups }: Props) {
           placeholder="Buscar topic…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-48 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          className="h-7 w-48 rounded-md border border-input bg-input/20 px-2 py-1.5 text-xs placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
         />
 
         <Select value={group} onValueChange={setGroup}>
@@ -101,6 +105,10 @@ export function DashboardFilters({ topics, groups }: Props) {
             <SelectItem value="score_asc">Sort: Score ↑</SelectItem>
             <SelectItem value="date_desc">Sort: Date ↓</SelectItem>
             <SelectItem value="date_asc">Sort: Date ↑</SelectItem>
+            <SelectItem value="days_desc">Sort: Días ↓</SelectItem>
+            <SelectItem value="days_asc">Sort: Días ↑</SelectItem>
+            <SelectItem value="recalls_desc">Sort: Recalls ↓</SelectItem>
+            <SelectItem value="recalls_asc">Sort: Recalls ↑</SelectItem>
           </SelectContent>
         </Select>
       </div>
