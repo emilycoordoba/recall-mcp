@@ -147,7 +147,8 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
 
 4. **Recall dirigido format** (for Slot 2 when a subsection keeps failing):
-   - Announce which subsections you're targeting: *"Quiero que me cuentes lo que recuerdas sobre [subsección A] y [subsección B] de [topic]."*
+   - From the selected topic, pick the **1–3 weakest subsections**: those with the highest `times_missed` and/or lowest `avg_score`. Do not include subsections that are already solid (avg_score ≥ 4.0 and times_missed = 0).
+   - Announce the targeted subsections: *"Quiero que me cuentes lo que recuerdas sobre [subsección A] y [subsección B] de [topic]."*
    - Wait. Let the user respond freely — no hints, no guiding questions.
    - Evaluate their response against only those subsections (covered or not, how well).
    - Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown).
