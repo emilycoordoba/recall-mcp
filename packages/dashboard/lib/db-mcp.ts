@@ -100,17 +100,55 @@ async function getOrCreateTopic(name: string, groupId: number | null): Promise<n
 // ─── Read operations ──────────────────────────────────────────────────────────
 
 export async function findTopics(query: string) {
-  const { data, error } = await supabase
-    .from("topics")
-    .select("id, name, group_id, topic_groups(name)")
-    .ilike("name", `%${query}%`)
-    .order("name");
-  if (error) throw error;
-  return (data ?? []).map((t) => ({
-    ...t,
-    group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
-    topic_groups: undefined,
-  }));
+  const [{ data: topicData, error: te }, { data: subsData, error: se }] = await Promise.all([
+    supabase
+      .from("topics")
+      .select("id, name, group_id, topic_groups(name)")
+      .ilike("name", `%${query}%`)
+      .order("name"),
+    supabase
+      .from("topic_subsections")
+      .select("name, topic_id, topics(id, name, group_id, topic_groups(name))")
+      .ilike("name", `%${query}%`),
+  ]);
+  if (te) throw te;
+  if (se) throw se;
+
+  const map = new Map<number, {
+    id: number; name: string; group_name: string | null;
+    match_type: "topic" | "subsection" | "both";
+    matched_subsections: string[];
+  }>();
+
+  for (const t of topicData ?? []) {
+    map.set(t.id, {
+      id: t.id,
+      name: t.name,
+      group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
+      match_type: "topic",
+      matched_subsections: [],
+    });
+  }
+
+  for (const s of subsData ?? []) {
+    const parent = s.topics as { id: number; name: string; group_id: number | null; topic_groups: { name: string } | null } | null;
+    if (!parent) continue;
+    const existing = map.get(parent.id);
+    if (existing) {
+      existing.match_type = "both";
+      existing.matched_subsections.push(s.name);
+    } else {
+      map.set(parent.id, {
+        id: parent.id,
+        name: parent.name,
+        group_name: (parent.topic_groups as { name: string } | null)?.name ?? null,
+        match_type: "subsection",
+        matched_subsections: [s.name],
+      });
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getTopicByName(name: string) {

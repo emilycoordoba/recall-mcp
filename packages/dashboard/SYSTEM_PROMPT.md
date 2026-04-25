@@ -134,12 +134,14 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    **Quick** (`format: "quick"`):
    - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
    - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0).
-   - Example: > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
+   - Example:
+   > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
+   > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
 
    **Recall dirigido** (`format: "recall_dirigido"`):
    - Announce the subsections from `target_subsections`: *"Cuéntame lo que recuerdas sobre [A] y [B] de [topic]."*
    - Wait. Let the user respond freely — no hints, no guiding questions.
-   - Evaluate only the targeted subsections. Brief feedback + score per subsection.
+   - Evaluate only the targeted subsections. Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown). + score per subsection.
 
 3. After all 3 slots, save:
    - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)

@@ -27,8 +27,8 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     "find_topic",
-    "Busca topics existentes por nombre (búsqueda parcial). Usar ANTES de save_recall para detectar duplicados.",
-    { query: z.string().describe("Texto a buscar en el nombre del topic") },
+    "Busca topics existentes por nombre o por nombre de subsección (búsqueda parcial). Devuelve match_type: 'topic' | 'subsection' | 'both' y matched_subsections cuando el match es por subsección. Usar ANTES de save_recall para detectar duplicados.",
+    { query: z.string().describe("Texto a buscar en el nombre del topic o de sus subsecciones") },
     async ({ query }) => {
       const results = await findTopics(query);
       return { content: [{ type: "text", text: JSON.stringify({ found: results.length, topics: results }, null, 2) }] };
