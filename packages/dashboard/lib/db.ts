@@ -174,6 +174,54 @@ export async function getQuickReviews(topicId: number): Promise<QuickReviewRow[]
   return (data ?? []) as QuickReviewRow[];
 }
 
+export interface HistoryEntry {
+  id: number;
+  type: "recall" | "quick_review";
+  date: string;
+  topic_id: number;
+  topic_name: string;
+  group_name: string | null;
+  score: number | null;
+}
+
+export async function getHistory(): Promise<HistoryEntry[]> {
+  const [{ data: recalls, error: re }, { data: qrs, error: qe }] = await Promise.all([
+    supabase
+      .from("recalls")
+      .select("id, recalled_at, overall_score, topic_id, topics(name, topic_groups(name))")
+      .order("recalled_at", { ascending: false }),
+    supabase
+      .from("quick_review_sessions")
+      .select("id, reviewed_at, overall_score, topic_id, topics(name, topic_groups(name))")
+      .order("reviewed_at", { ascending: false }),
+  ]);
+
+  if (re) throw re;
+  if (qe) throw qe;
+
+  const recallEntries: HistoryEntry[] = (recalls ?? []).map((r) => ({
+    id: r.id,
+    type: "recall",
+    date: r.recalled_at,
+    topic_id: r.topic_id,
+    topic_name: (r.topics as { name: string } | null)?.name ?? "Unknown",
+    group_name: ((r.topics as { topic_groups: { name: string } | null } | null)?.topic_groups)?.name ?? null,
+    score: r.overall_score,
+  }));
+
+  const qrEntries: HistoryEntry[] = (qrs ?? []).map((q) => ({
+    id: q.id,
+    type: "quick_review",
+    date: q.reviewed_at,
+    topic_id: q.topic_id,
+    topic_name: (q.topics as { name: string } | null)?.name ?? "Unknown",
+    group_name: ((q.topics as { topic_groups: { name: string } | null } | null)?.topic_groups)?.name ?? null,
+    score: q.overall_score,
+  }));
+
+  return [...recallEntries, ...qrEntries].sort((a, b) => b.date.localeCompare(a.date));
+}
+
 export async function getQuickReviewAnswers(sessionId: number): Promise<QuickReviewAnswerRow[]> {
   const { data, error } = await supabase
     .from("quick_review_answers")
