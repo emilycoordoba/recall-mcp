@@ -2,6 +2,8 @@ import Link from "next/link"
 import { getTopics } from "@/lib/db"
 import { DashboardFilters } from "@/components/dashboard-filters"
 
+export const revalidate = 30
+
 export default async function DashboardPage() {
   const topics = await getTopics()
   const groups = Array.from(

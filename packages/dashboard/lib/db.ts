@@ -174,6 +174,20 @@ export async function getQuickReviews(topicId: number): Promise<QuickReviewRow[]
   return (data ?? []) as QuickReviewRow[];
 }
 
+export interface HistorySubsection {
+  name: string;
+  covered: boolean;
+  score: number | null;
+}
+
+export interface HistoryAnswer {
+  subsection_name: string | null;
+  question: string;
+  answer: string | null;
+  score: number | null;
+  feedback: string | null;
+}
+
 export interface HistoryEntry {
   id: number;
   type: "recall" | "quick_review";
@@ -182,41 +196,68 @@ export interface HistoryEntry {
   topic_name: string;
   group_name: string | null;
   score: number | null;
+  feedback: string | null;
+  subsections: HistorySubsection[];
+  answers: HistoryAnswer[];
 }
 
 export async function getHistory(): Promise<HistoryEntry[]> {
   const [{ data: recalls, error: re }, { data: qrs, error: qe }] = await Promise.all([
     supabase
       .from("recalls")
-      .select("id, recalled_at, overall_score, topic_id, topics(name, topic_groups(name))")
+      .select(`
+        id, recalled_at, overall_score, feedback, topic_id,
+        topics(name, topic_groups(name)),
+        recall_subsections(covered, score, topic_subsections(name, order_index))
+      `)
       .order("recalled_at", { ascending: false }),
     supabase
       .from("quick_review_sessions")
-      .select("id, reviewed_at, overall_score, topic_id, topics(name, topic_groups(name))")
+      .select(`
+        id, reviewed_at, overall_score, topic_id,
+        topics(name, topic_groups(name)),
+        quick_review_answers(question, answer, score, feedback, topic_subsections(name))
+      `)
       .order("reviewed_at", { ascending: false }),
   ]);
 
   if (re) throw re;
   if (qe) throw qe;
 
-  const recallEntries: HistoryEntry[] = (recalls ?? []).map((r) => ({
+  const recallEntries: HistoryEntry[] = ((recalls ?? []) as any[]).map((r) => ({
     id: r.id,
-    type: "recall",
+    type: "recall" as const,
     date: r.recalled_at,
     topic_id: r.topic_id,
-    topic_name: (r.topics as { name: string } | null)?.name ?? "Unknown",
-    group_name: ((r.topics as { topic_groups: { name: string } | null } | null)?.topic_groups)?.name ?? null,
+    topic_name: r.topics?.name ?? "Unknown",
+    group_name: r.topics?.topic_groups?.name ?? null,
     score: r.overall_score,
+    feedback: r.feedback ?? null,
+    subsections: (r.recall_subsections ?? []).map((s: any) => ({
+      name: s.topic_subsections?.name ?? "?",
+      covered: Boolean(s.covered),
+      score: s.score,
+    })),
+    answers: [],
   }));
 
-  const qrEntries: HistoryEntry[] = (qrs ?? []).map((q) => ({
+  const qrEntries: HistoryEntry[] = ((qrs ?? []) as any[]).map((q) => ({
     id: q.id,
-    type: "quick_review",
+    type: "quick_review" as const,
     date: q.reviewed_at,
     topic_id: q.topic_id,
-    topic_name: (q.topics as { name: string } | null)?.name ?? "Unknown",
-    group_name: ((q.topics as { topic_groups: { name: string } | null } | null)?.topic_groups)?.name ?? null,
+    topic_name: q.topics?.name ?? "Unknown",
+    group_name: q.topics?.topic_groups?.name ?? null,
     score: q.overall_score,
+    feedback: null,
+    subsections: [],
+    answers: (q.quick_review_answers ?? []).map((a: any) => ({
+      subsection_name: a.topic_subsections?.name ?? null,
+      question: a.question,
+      answer: a.answer ?? null,
+      score: a.score,
+      feedback: a.feedback ?? null,
+    })),
   }));
 
   return [...recallEntries, ...qrEntries].sort((a, b) => b.date.localeCompare(a.date));

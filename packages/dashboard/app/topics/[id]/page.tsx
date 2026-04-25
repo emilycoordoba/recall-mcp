@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { notFound } from "next/navigation"
 import { getTopic, getSubsections, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
 import { Badge } from "@/components/ui/badge"
@@ -11,10 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { IconArrowLeft, IconCheck, IconX, IconBolt } from "@tabler/icons-react"
+import { IconCheck, IconX, IconBolt } from "@tabler/icons-react"
+import { BackButton } from "@/components/back-button"
+
+export const revalidate = 30
 
 function formatDate(iso: string) {
-  return new Date(iso + "Z").toLocaleDateString("es-ES", {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -25,9 +29,11 @@ function formatDate(iso: string) {
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground">—</span>
-  const variant =
-    score >= 4.0 ? "default" : score >= 3.0 ? "secondary" : "destructive"
-  return <Badge variant={variant}>{score.toFixed(1)}</Badge>
+  if (score >= 4.0)
+    return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-transparent">{score.toFixed(1)}</Badge>
+  if (score >= 3.0)
+    return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-transparent">{score.toFixed(1)}</Badge>
+  return <Badge variant="destructive">{score.toFixed(1)}</Badge>
 }
 
 export default async function TopicPage({
@@ -69,14 +75,7 @@ export default async function TopicPage({
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
-      {/* Back */}
-      <Link
-        href="/"
-        className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <IconArrowLeft className="h-4 w-4" />
-        Dashboard
-      </Link>
+      <BackButton />
 
       {/* Header */}
       <div className="mb-8">
