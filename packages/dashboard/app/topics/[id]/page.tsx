@@ -218,7 +218,7 @@ export default async function TopicPage({
                           <p className="text-muted-foreground leading-relaxed pt-1">{a.answer}</p>
                         )}
                         {a.feedback && (
-                          <p className="text-xs text-muted-foreground italic pt-1">{a.feedback}</p>
+                          <p className="text-sm text-muted-foreground pt-1">{a.feedback}</p>
                         )}
                       </div>
                     ))}

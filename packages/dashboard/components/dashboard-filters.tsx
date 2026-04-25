@@ -53,7 +53,10 @@ interface Props {
 export function DashboardFilters({ topics, groups }: Props) {
   const [search, setSearch] = useState("")
   const [group, setGroup] = useState("all")
-  const [sort, setSort] = useState<SortKey>("name")
+  const [sort, setSort] = useState<SortKey>(() => {
+    if (typeof window === "undefined") return "name"
+    return (localStorage.getItem("dashboard-sort") as SortKey) ?? "name"
+  })
 
   const filtered = topics
     .filter((t) => group === "all" || t.group_name === group)
@@ -95,7 +98,7 @@ export function DashboardFilters({ topics, groups }: Props) {
           </SelectContent>
         </Select>
 
-        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+        <Select value={sort} onValueChange={(v) => { const k = v as SortKey; setSort(k); localStorage.setItem("dashboard-sort", k) }}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Sort by name" />
           </SelectTrigger>
