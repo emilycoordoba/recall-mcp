@@ -15,11 +15,20 @@ type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc"
 
 function formatDate(iso: string | null) {
   if (!iso) return "—"
-  return new Date(iso + "Z").toLocaleDateString("es-ES", {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return "—"
+  return d.toLocaleDateString("es-ES", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   })
+}
+
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return null
+  return Math.floor((Date.now() - d.getTime()) / 86_400_000)
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -88,7 +97,7 @@ export default async function DashboardPage({
               <TableHead className="text-center">Last Score</TableHead>
               <TableHead>Last Recall</TableHead>
               <TableHead className="text-right">Recalls</TableHead>
-              <TableHead className="text-right">Quick</TableHead>
+              <TableHead className="text-right">Días</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -128,8 +137,13 @@ export default async function DashboardPage({
                   <TableCell className="text-right font-mono text-xs text-muted-foreground">
                     {topic.total_recalls}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                    {topic.total_quick_reviews || "—"}
+                  <TableCell className="text-right font-mono text-xs">
+                    {(() => {
+                      const d = daysSince(topic.last_recalled_at)
+                      if (d === null) return <span className="text-muted-foreground">—</span>
+                      const color = d >= 14 ? "text-destructive" : d >= 7 ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"
+                      return <span className={color}>{d}d</span>
+                    })()}
                   </TableCell>
                 </TableRow>
               ))
