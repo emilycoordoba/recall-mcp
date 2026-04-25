@@ -51,6 +51,7 @@ export interface QuickReviewRow {
   topic_id: number;
   reviewed_at: string;
   overall_score: number | null;
+  feedback: string | null;
 }
 
 export interface QuickReviewAnswerRow {
@@ -60,6 +61,7 @@ export interface QuickReviewAnswerRow {
   question: string;
   answer: string | null;
   score: number | null;
+  feedback: string | null;
 }
 
 export async function getTopics(): Promise<TopicRow[]> {
@@ -166,7 +168,7 @@ export async function getRecallSubsections(recallId: number): Promise<RecallSubs
 export async function getQuickReviews(topicId: number): Promise<QuickReviewRow[]> {
   const { data, error } = await supabase
     .from("quick_review_sessions")
-    .select("*")
+    .select("id, topic_id, reviewed_at, overall_score, feedback")
     .eq("topic_id", topicId)
     .order("reviewed_at", { ascending: false });
 
@@ -266,7 +268,7 @@ export async function getHistory(): Promise<HistoryEntry[]> {
 export async function getQuickReviewAnswers(sessionId: number): Promise<QuickReviewAnswerRow[]> {
   const { data, error } = await supabase
     .from("quick_review_answers")
-    .select("id, session_id, question, answer, score, topic_subsections(name)")
+    .select("id, session_id, question, answer, score, feedback, topic_subsections(name)")
     .eq("session_id", sessionId)
     .order("id");
 
@@ -279,5 +281,6 @@ export async function getQuickReviewAnswers(sessionId: number): Promise<QuickRev
     question: row.question,
     answer: row.answer,
     score: row.score,
+    feedback: row.feedback ?? null,
   }));
 }

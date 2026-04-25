@@ -196,7 +196,12 @@ export default async function TopicPage({
                     <ScoreBadge score={session.data.overall_score} />
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {session.data.overall_score !== null && session.data.feedback && (
+                    <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-4 py-3 text-sm leading-relaxed">
+                      {session.data.feedback}
+                    </p>
+                  )}
                   <div className="space-y-3">
                     {session.data.answers.map((a, i) => (
                       <div key={a.id} className="rounded-md bg-muted/30 px-4 py-3 text-sm space-y-1">
@@ -211,6 +216,9 @@ export default async function TopicPage({
                         )}
                         {a.answer && (
                           <p className="text-muted-foreground leading-relaxed pt-1">{a.answer}</p>
+                        )}
+                        {a.feedback && (
+                          <p className="text-xs text-muted-foreground italic pt-1">{a.feedback}</p>
                         )}
                       </div>
                     ))}
