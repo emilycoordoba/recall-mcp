@@ -200,24 +200,29 @@ export async function getSubsections(topicId: number): Promise<Subsection[]> {
 
 export interface SubsectionStat extends Subsection {
   practice_count: number;
+  avg_score: number | null;
+  mastered: boolean;
 }
 
 export async function getSubsectionStats(topicId: number): Promise<SubsectionStat[]> {
   const { data, error } = await supabase
     .from("topic_subsections")
-    .select("id, topic_id, name, order_index, recall_subsections(id), quick_review_answers(id)")
+    .select("id, topic_id, name, order_index, recall_subsections(covered, score), quick_review_answers(score)")
     .eq("topic_id", topicId)
     .order("order_index");
 
   if (error) throw error;
 
-  return ((data ?? []) as any[]).map((s) => ({
-    id: s.id,
-    topic_id: s.topic_id,
-    name: s.name,
-    order_index: s.order_index,
-    practice_count: (s.recall_subsections?.length ?? 0) + (s.quick_review_answers?.length ?? 0),
-  }));
+  return ((data ?? []) as any[]).map((s) => {
+    const recallScores: number[] = (s.recall_subsections ?? []).map((r: any) => r.score).filter((v: any) => v !== null);
+    const qrScores: number[] = (s.quick_review_answers ?? []).map((q: any) => q.score).filter((v: any) => v !== null);
+    const allScores = [...recallScores, ...qrScores];
+    const recallMisses: number = (s.recall_subsections ?? []).filter((r: any) => !r.covered).length;
+    const practice_count = allScores.length;
+    const avg_score = allScores.length ? allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length : null;
+    const mastered = practice_count >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && recallMisses === 0;
+    return { id: s.id, topic_id: s.topic_id, name: s.name, order_index: s.order_index, practice_count, avg_score, mastered };
+  });
 }
 
 export async function getRecalls(topicId: number): Promise<RecallRow[]> {

@@ -58,7 +58,7 @@ export interface ReviewCandidate {
   avg_score: number | null;
   urgency: number;
   total_recalls: number;
-  subsections: { name: string; avg_score: number | null; times_missed: number }[];
+  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean }[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -350,11 +350,10 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         );
         const recentRs = sortedRs.slice(-RECENT_WINDOW);
 
-        return {
-          name: s.name,
-          avg_score: allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null,
-          times_missed: recentRs.filter((r) => !r.covered).length,
-        };
+        const avg_score = allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null;
+        const times_missed = recentRs.filter((r) => !r.covered).length;
+        const mastered = allEntries.length >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && times_missed === 0;
+        return { name: s.name, avg_score, times_missed, mastered };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
 
       return {
@@ -642,12 +641,15 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   const used = new Set<number>();
 
   function weakestQuickSubsection(c: ReviewCandidate): string {
-    const ranked = [...c.subsections].sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
+    const pool = c.subsections.filter((s) => !s.mastered);
+    const ranked = [...(pool.length > 0 ? pool : c.subsections)]
+      .sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
     return ranked[0]?.name ?? "general";
   }
 
   function weakestRecallSubsections(c: ReviewCandidate): string[] {
     return [...c.subsections]
+      .filter((s) => !s.mastered)
       .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0 && s.times_missed === 0))
       .sort((a, b) => b.times_missed - a.times_missed || (a.avg_score ?? 0) - (b.avg_score ?? 0))
       .slice(0, 3)

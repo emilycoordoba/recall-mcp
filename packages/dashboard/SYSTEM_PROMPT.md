@@ -147,6 +147,11 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)
    - Recall dirigido slot → `save_recall` (targeted subsections only — do NOT call `save_topic_subsections` first)
 
+4. Give a **brief session summary** (2–4 lines total, after saving):
+   - One line per topic: score + what was strong + what still needs work.
+   - End with one line on what to prioritize in the next session.
+   - Example: *"BLAS 4.0 — blocking sólido, revisar niveles 1/2/3. Punteros en C 3.5 — aritmética bien, arreglos multidimensionales flojos. Próxima: profundizar punteros y revisar TCP/IP que lleva más de 2 semanas sin tocarse."*
+
 Keep the session fast. Do not trigger the full recall flow. Do not ask "any questions before we start?".
 
 Full recalls are still available at any time if the user explicitly asks for one.
