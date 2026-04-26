@@ -268,10 +268,11 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       id, name,
       topic_groups(name),
       recalls(id, recalled_at, overall_score),
-      quick_review_sessions(reviewed_at),
+      quick_review_sessions(id, reviewed_at),
       topic_subsections(
         id, name,
-        recall_subsections(recall_id, covered, score)
+        recall_subsections(recall_id, covered, score),
+        quick_review_answers(session_id, score)
       )
     `)
     .order("name");
@@ -291,7 +292,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
   return ((data ?? []) as any[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number }[] = t.recalls ?? [];
-      const qrs: { reviewed_at: string }[] = t.quick_review_sessions ?? [];
+      const qrs: { id: number; reviewed_at: string }[] = t.quick_review_sessions ?? [];
 
       // Bug 2 fix: urgency uses only full recall dates; display uses any session date
       const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
@@ -315,20 +316,31 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         ? recentRecalls.reduce((s, r) => s + r.overall_score, 0) / recentRecalls.length
         : null;
 
-      // Urgency driven by full recall staleness; falls back to any session for topics with only quick reviews
+      // Bug 5 fix: consolidation factor — more recalls = topic can wait longer (logarithmic growth)
+      // log(0 + e) = 1 so new topics are unaffected; log grows slowly preventing over-suppression
+      const consolidation = Math.log(recalls.length + Math.E);
       const urgencyDays = daysSinceFullRecall ?? daysSince ?? 0;
       const urgency =
         recalls.length === 0 && qrs.length === 0
           ? 999
-          : urgencyDays / ((avgScore ?? 0) + 1);
+          : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
-      // Map recall_id → recalled_at so subsections can be sorted by session date
+      // Maps for cross-referencing session dates in subsection calculations
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
+      const qrDateMap = new Map(qrs.map((q) => [q.id, q.reviewed_at]));
 
       const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
         const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
+        const qas: { session_id: number; score: number }[] = s.quick_review_answers ?? [];
 
-        // Sort oldest→newest then take the tail so we get the RECENT_WINDOW most recent sessions
+        // Bug 3 fix: avg_score merges recall and quick review scores, ordered by session date
+        const recallEntries = rs.map((r) => ({ date: recallDateMap.get(r.recall_id) ?? "", score: r.score }));
+        const qrEntries = qas.map((q) => ({ date: qrDateMap.get(q.session_id) ?? "", score: q.score }));
+        const allEntries = [...recallEntries, ...qrEntries]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(-RECENT_WINDOW);
+
+        // times_missed only from recalls — quick reviews have no "covered" concept
         const sortedRs = [...rs].sort((a, b) =>
           (recallDateMap.get(a.recall_id) ?? "").localeCompare(recallDateMap.get(b.recall_id) ?? ""),
         );
@@ -336,7 +348,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
         return {
           name: s.name,
-          avg_score: recentRs.length ? recentRs.reduce((acc, r) => acc + r.score, 0) / recentRs.length : null,
+          avg_score: allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null,
           times_missed: recentRs.filter((r) => !r.covered).length,
         };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
