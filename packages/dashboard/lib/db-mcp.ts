@@ -338,13 +338,13 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       for (const r of sortedForSM2) {
         const q = r.overall_score ?? 0;
         if (q >= 3) {
-          if (sm2Reps === 0) sm2Interval = 1;
-          else if (sm2Reps === 1) sm2Interval = 6;
+          if (sm2Reps === 0) sm2Interval = 3;
+          else if (sm2Reps === 1) sm2Interval = 14;
           else sm2Interval = Math.round(sm2Interval * sm2EF);
           sm2Reps++;
         } else {
           sm2Reps = 0;
-          sm2Interval = 1;
+          sm2Interval = 3;
         }
         sm2EF = Math.max(1.3, sm2EF + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
       }

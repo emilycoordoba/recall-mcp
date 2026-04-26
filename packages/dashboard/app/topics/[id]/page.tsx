@@ -78,9 +78,11 @@ export default async function TopicPage({
                     {i + 1}.
                   </span>
                   <span className="flex-1">{s.name}</span>
-                  {s.mastered && (
+                  {s.mastered ? (
                     <span className="text-xs text-green-600 dark:text-green-400" title="Dominada">✓</span>
-                  )}
+                  ) : s.practice_count > 0 ? (
+                    <span className="text-xs text-amber-500" title="En progreso">○</span>
+                  ) : null}
                   {s.practice_count > 0 && (
                     <span className="font-mono text-xs text-muted-foreground">
                       ×{s.practice_count}

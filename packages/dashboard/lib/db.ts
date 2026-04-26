@@ -160,13 +160,13 @@ export async function getTopics(): Promise<TopicRow[]> {
     for (const r of sortedForSM2) {
       const q = r.overall_score ?? 0;
       if (q >= 3) {
-        if (sm2Reps === 0) sm2Interval = 1;
-        else if (sm2Reps === 1) sm2Interval = 6;
+        if (sm2Reps === 0) sm2Interval = 3;
+        else if (sm2Reps === 1) sm2Interval = 14;
         else sm2Interval = Math.round(sm2Interval * sm2EF);
         sm2Reps++;
       } else {
         sm2Reps = 0;
-        sm2Interval = 1;
+        sm2Interval = 3;
       }
       sm2EF = Math.max(1.3, sm2EF + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
     }
@@ -179,13 +179,15 @@ export async function getTopics(): Promise<TopicRow[]> {
       ? Math.round((Date.parse(todayIso) - Date.parse(next_review_date)) / 86_400_000)
       : null;
 
-    // Forgetting curve: R = e^(-daysSince / sm2Interval)
+    // Forgetting curve: R = e^(-daysSince / stability)
+    // Only meaningful after ≥3 recalls — below that there's not enough history to model decay
     const daysSinceRecall = lastRecallIso
       ? Math.floor((Date.now() - new Date(lastRecallIso).getTime()) / 86_400_000)
       : null;
+    const stability = Math.max(7, sm2Interval);
     const retention =
-      recalls.length > 0 && daysSinceRecall !== null && last_score !== null
-        ? Math.round(Math.exp(-daysSinceRecall / Math.max(1, sm2Interval)) * 100) / 100
+      recalls.length >= 3 && daysSinceRecall !== null && last_score !== null
+        ? Math.round(Math.exp(-daysSinceRecall / stability) * 100) / 100
         : null;
     const effective_score =
       last_score !== null && retention !== null

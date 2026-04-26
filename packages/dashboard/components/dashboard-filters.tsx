@@ -59,9 +59,12 @@ function RetentionBadge({ score, effectiveScore, retention }: { score: number | 
   )
 }
 
-function NextReviewCell({ daysOverdue }: { daysOverdue: number | null }) {
+function NextReviewCell({ daysOverdue, dimmed }: { daysOverdue: number | null; dimmed?: boolean }) {
   if (daysOverdue === null) return <span className="text-muted-foreground font-mono text-xs">—</span>
-  if (daysOverdue > 0) return <span className="text-destructive font-mono text-xs">+{daysOverdue}d</span>
+  if (daysOverdue > 0) {
+    const cls = dimmed ? "text-muted-foreground" : "text-destructive"
+    return <span className={`${cls} font-mono text-xs`}>+{daysOverdue}d</span>
+  }
   if (daysOverdue === 0) return <span className="text-yellow-600 dark:text-yellow-400 font-mono text-xs">hoy</span>
   return <span className="text-muted-foreground font-mono text-xs">en {-daysOverdue}d</span>
 }
@@ -197,7 +200,7 @@ export function DashboardFilters({ topics, groups }: Props) {
                       {topic.total_recalls}
                     </TableCell>
                     <TableCell className="text-right">
-                      <NextReviewCell daysOverdue={topic.days_overdue} />
+                      <NextReviewCell daysOverdue={topic.days_overdue} dimmed={topic.total_recalls < 2} />
                     </TableCell>
                   </TableRow>
                 ))
