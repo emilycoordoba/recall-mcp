@@ -257,17 +257,21 @@ export async function filterTopics(
   });
 }
 
+// Number of most recent recall sessions used to compute scores and times_missed.
+// Keeps metrics reflecting current knowledge rather than accumulating indefinitely.
+const RECENT_WINDOW = 5;
+
 export async function getReviewCandidates(groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase
     .from("topics")
     .select(`
       id, name,
       topic_groups(name),
-      recalls(recalled_at, overall_score),
+      recalls(id, recalled_at, overall_score),
       quick_review_sessions(reviewed_at),
       topic_subsections(
         id, name,
-        recall_subsections(covered, score)
+        recall_subsections(recall_id, covered, score)
       )
     `)
     .order("name");
@@ -286,34 +290,54 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
   return ((data ?? []) as any[])
     .map((t) => {
-      const recalls: { recalled_at: string; overall_score: number }[] = t.recalls ?? [];
+      const recalls: { id: number; recalled_at: string; overall_score: number }[] = t.recalls ?? [];
       const qrs: { reviewed_at: string }[] = t.quick_review_sessions ?? [];
+
+      // Bug 2 fix: urgency uses only full recall dates; display uses any session date
+      const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
+      const lastRecallDate = sortedRecalls[0]?.recalled_at ?? null;
+      const daysSinceFullRecall = lastRecallDate
+        ? Math.floor((Date.now() - new Date(lastRecallDate).getTime()) / 86_400_000)
+        : null;
 
       const allDates = [
         ...recalls.map((r) => r.recalled_at),
         ...qrs.map((qr) => qr.reviewed_at),
       ].filter(Boolean).sort();
-
       const lastDate = allDates.at(-1) ?? null;
       const daysSince = lastDate
         ? Math.floor((Date.now() - new Date(lastDate).getTime()) / 86_400_000)
         : null;
 
-      const avgScore = recalls.length
-        ? recalls.reduce((s, r) => s + r.overall_score, 0) / recalls.length
+      // Bug 1 fix: avg_score uses only the last RECENT_WINDOW full recalls
+      const recentRecalls = sortedRecalls.slice(0, RECENT_WINDOW);
+      const avgScore = recentRecalls.length
+        ? recentRecalls.reduce((s, r) => s + r.overall_score, 0) / recentRecalls.length
         : null;
 
+      // Urgency driven by full recall staleness; falls back to any session for topics with only quick reviews
+      const urgencyDays = daysSinceFullRecall ?? daysSince ?? 0;
       const urgency =
         recalls.length === 0 && qrs.length === 0
           ? 999
-          : (daysSince ?? 0) / ((avgScore ?? 0) + 1);
+          : urgencyDays / ((avgScore ?? 0) + 1);
+
+      // Map recall_id → recalled_at so subsections can be sorted by session date
+      const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
 
       const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
-        const rs: { covered: boolean; score: number }[] = s.recall_subsections ?? [];
+        const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
+
+        // Sort oldest→newest then take the tail so we get the RECENT_WINDOW most recent sessions
+        const sortedRs = [...rs].sort((a, b) =>
+          (recallDateMap.get(a.recall_id) ?? "").localeCompare(recallDateMap.get(b.recall_id) ?? ""),
+        );
+        const recentRs = sortedRs.slice(-RECENT_WINDOW);
+
         return {
           name: s.name,
-          avg_score: rs.length ? rs.reduce((acc, r) => acc + r.score, 0) / rs.length : null,
-          times_missed: rs.filter((r) => !r.covered).length,
+          avg_score: recentRs.length ? recentRs.reduce((acc, r) => acc + r.score, 0) / recentRs.length : null,
+          times_missed: recentRs.filter((r) => !r.covered).length,
         };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
 
