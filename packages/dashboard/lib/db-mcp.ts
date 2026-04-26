@@ -58,6 +58,9 @@ export interface ReviewCandidate {
   avg_score: number | null;
   urgency: number;
   total_recalls: number;
+  next_review_date: string | null;
+  days_overdue: number;
+  sm2_interval: number;
   subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean }[];
 }
 
@@ -329,6 +332,31 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
           ? 999
           : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
+      // SM-2: compute interval from full recall history (chronological)
+      const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+      let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
+      for (const r of sortedForSM2) {
+        const q = r.overall_score ?? 0;
+        if (q >= 3) {
+          if (sm2Reps === 0) sm2Interval = 1;
+          else if (sm2Reps === 1) sm2Interval = 6;
+          else sm2Interval = Math.round(sm2Interval * sm2EF);
+          sm2Reps++;
+        } else {
+          sm2Reps = 0;
+          sm2Interval = 1;
+        }
+        sm2EF = Math.max(1.3, sm2EF + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+      }
+      const lastRIso = sortedForSM2.at(-1)?.recalled_at ?? null;
+      const nextReviewDate = lastRIso
+        ? new Date(new Date(lastRIso).getTime() + sm2Interval * 86_400_000).toISOString().slice(0, 10)
+        : null;
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const daysOverdue = nextReviewDate
+        ? Math.round((Date.parse(todayIso) - Date.parse(nextReviewDate)) / 86_400_000)
+        : recalls.length === 0 ? 999 : 0;
+
       // Maps for cross-referencing session dates in subsection calculations
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
       const qrDateMap = new Map(qrs.map((q) => [q.id, q.reviewed_at]));
@@ -364,10 +392,13 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         avg_score: avgScore !== null ? Math.round(avgScore * 100) / 100 : null,
         urgency: Math.round(urgency * 100) / 100,
         total_recalls: recalls.length,
+        next_review_date: nextReviewDate,
+        days_overdue: daysOverdue,
+        sm2_interval: sm2Interval,
         subsections,
       };
     })
-    .sort((a, b) => b.urgency - a.urgency);
+    .sort((a, b) => b.days_overdue - a.days_overdue);
 }
 
 // ─── Write operations ─────────────────────────────────────────────────────────

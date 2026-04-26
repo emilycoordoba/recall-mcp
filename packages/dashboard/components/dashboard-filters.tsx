@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import type { TopicRow } from "@/lib/db"
 
-type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc"
+type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc" | "overdue_desc" | "overdue_asc"
 
 function formatDate(iso: string | null) {
   if (!iso) return "—"
@@ -43,6 +43,27 @@ function ScoreBadge({ score }: { score: number | null }) {
   if (score >= 3.0)
     return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-transparent">{score.toFixed(1)}</Badge>
   return <Badge variant="destructive">{score.toFixed(1)}</Badge>
+}
+
+function RetentionBadge({ score, effectiveScore, retention }: { score: number | null; effectiveScore: number | null; retention: number | null }) {
+  if (score === null) return <span className="text-muted-foreground">—</span>
+  const decayed = retention !== null && retention < 0.9
+  const display = decayed ? effectiveScore : score
+  return (
+    <span className="inline-flex flex-col items-center gap-0">
+      <ScoreBadge score={display} />
+      {decayed && retention !== null && (
+        <span className="text-[10px] text-muted-foreground">{Math.round(retention * 100)}%</span>
+      )}
+    </span>
+  )
+}
+
+function NextReviewCell({ daysOverdue }: { daysOverdue: number | null }) {
+  if (daysOverdue === null) return <span className="text-muted-foreground font-mono text-xs">—</span>
+  if (daysOverdue > 0) return <span className="text-destructive font-mono text-xs">+{daysOverdue}d</span>
+  if (daysOverdue === 0) return <span className="text-yellow-600 dark:text-yellow-400 font-mono text-xs">hoy</span>
+  return <span className="text-muted-foreground font-mono text-xs">en {-daysOverdue}d</span>
 }
 
 function TrendIndicator({ trend }: { trend: "up" | "down" | "flat" | null }) {
@@ -80,6 +101,8 @@ export function DashboardFilters({ topics, groups }: Props) {
         case "recalls_asc":   return a.total_recalls - b.total_recalls
         case "urgency_desc":  return b.urgency - a.urgency
         case "urgency_asc":   return a.urgency - b.urgency
+        case "overdue_desc":  return (b.days_overdue ?? -999) - (a.days_overdue ?? -999)
+        case "overdue_asc":   return (a.days_overdue ?? 999) - (b.days_overdue ?? 999)
         default:              return a.name.localeCompare(b.name)
       }
     })
@@ -123,6 +146,8 @@ export function DashboardFilters({ topics, groups }: Props) {
             <SelectItem value="recalls_asc">Sort: Recalls ↑</SelectItem>
             <SelectItem value="urgency_desc">Sort: Urgencia ↓</SelectItem>
             <SelectItem value="urgency_asc">Sort: Urgencia ↑</SelectItem>
+            <SelectItem value="overdue_desc">Sort: Próxima ↓</SelectItem>
+            <SelectItem value="overdue_asc">Sort: Próxima ↑</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -136,7 +161,7 @@ export function DashboardFilters({ topics, groups }: Props) {
               <TableHead className="text-center">Last Score</TableHead>
               <TableHead>Last Recall</TableHead>
               <TableHead className="text-right">Recalls</TableHead>
-              <TableHead className="text-right">Días</TableHead>
+              <TableHead className="text-right">Próxima</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -147,15 +172,7 @@ export function DashboardFilters({ topics, groups }: Props) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((topic) => {
-                const days = daysSince(topic.last_recalled_at)
-                const daysColor = days === null
-                  ? "text-muted-foreground"
-                  : days >= 14 ? "text-destructive"
-                  : days >= 7  ? "text-yellow-600 dark:text-yellow-400"
-                  : "text-muted-foreground"
-
-                return (
+              filtered.map((topic) => (
                   <TableRow key={topic.id}>
                     <TableCell>
                       <Link href={`/topics/${topic.id}`} className="font-medium underline-offset-4 hover:underline">
@@ -169,7 +186,7 @@ export function DashboardFilters({ topics, groups }: Props) {
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="inline-flex items-center gap-1">
-                        <ScoreBadge score={topic.last_score} />
+                        <RetentionBadge score={topic.last_score} effectiveScore={topic.effective_score} retention={topic.retention} />
                         <TrendIndicator trend={topic.score_trend} />
                       </span>
                     </TableCell>
@@ -179,12 +196,11 @@ export function DashboardFilters({ topics, groups }: Props) {
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {topic.total_recalls}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs">
-                      <span className={daysColor}>{days !== null ? `${days}d` : "—"}</span>
+                    <TableCell className="text-right">
+                      <NextReviewCell daysOverdue={topic.days_overdue} />
                     </TableCell>
                   </TableRow>
-                )
-              })
+                ))
             )}
           </TableBody>
         </Table>

@@ -19,6 +19,10 @@ export interface TopicRow {
   total_quick_reviews: number;
   urgency: number;
   score_trend: "up" | "down" | "flat" | null;
+  retention: number | null;
+  effective_score: number | null;
+  next_review_date: string | null;
+  days_overdue: number | null;
 }
 
 export interface TopicDetail {
@@ -150,6 +154,44 @@ export async function getTopics(): Promise<TopicRow[]> {
       score_trend = diff > 0.3 ? "up" : diff < -0.3 ? "down" : "flat";
     }
 
+    // SM-2: compute interval from full recall history (chronological)
+    const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+    let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
+    for (const r of sortedForSM2) {
+      const q = r.overall_score ?? 0;
+      if (q >= 3) {
+        if (sm2Reps === 0) sm2Interval = 1;
+        else if (sm2Reps === 1) sm2Interval = 6;
+        else sm2Interval = Math.round(sm2Interval * sm2EF);
+        sm2Reps++;
+      } else {
+        sm2Reps = 0;
+        sm2Interval = 1;
+      }
+      sm2EF = Math.max(1.3, sm2EF + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
+    }
+    const lastRecallIso = sortedForSM2.at(-1)?.recalled_at ?? null;
+    const next_review_date = lastRecallIso
+      ? new Date(new Date(lastRecallIso).getTime() + sm2Interval * 86_400_000).toISOString().slice(0, 10)
+      : null;
+    const todayIso = localDateStr(new Date());
+    const days_overdue = next_review_date
+      ? Math.round((Date.parse(todayIso) - Date.parse(next_review_date)) / 86_400_000)
+      : null;
+
+    // Forgetting curve: R = e^(-daysSince / sm2Interval)
+    const daysSinceRecall = lastRecallIso
+      ? Math.floor((Date.now() - new Date(lastRecallIso).getTime()) / 86_400_000)
+      : null;
+    const retention =
+      recalls.length > 0 && daysSinceRecall !== null && last_score !== null
+        ? Math.round(Math.exp(-daysSinceRecall / Math.max(1, sm2Interval)) * 100) / 100
+        : null;
+    const effective_score =
+      last_score !== null && retention !== null
+        ? Math.round(last_score * retention * 100) / 100
+        : null;
+
     return {
       id: t.id,
       name: t.name,
@@ -163,6 +205,10 @@ export async function getTopics(): Promise<TopicRow[]> {
       total_quick_reviews: qrs.length,
       urgency,
       score_trend,
+      retention,
+      effective_score,
+      next_review_date,
+      days_overdue,
     };
   });
 }
@@ -207,7 +253,7 @@ export interface SubsectionStat extends Subsection {
 export async function getSubsectionStats(topicId: number): Promise<SubsectionStat[]> {
   const { data, error } = await supabase
     .from("topic_subsections")
-    .select("id, topic_id, name, order_index, recall_subsections(covered, score), quick_review_answers(score)")
+    .select("id, topic_id, name, order_index, recall_subsections(recall_id, covered, score), quick_review_answers(score)")
     .eq("topic_id", topicId)
     .order("order_index");
 
@@ -217,7 +263,8 @@ export async function getSubsectionStats(topicId: number): Promise<SubsectionSta
     const recallScores: number[] = (s.recall_subsections ?? []).map((r: any) => r.score).filter((v: any) => v !== null);
     const qrScores: number[] = (s.quick_review_answers ?? []).map((q: any) => q.score).filter((v: any) => v !== null);
     const allScores = [...recallScores, ...qrScores];
-    const recallMisses: number = (s.recall_subsections ?? []).filter((r: any) => !r.covered).length;
+    const recentRs = ([...(s.recall_subsections ?? [])] as any[]).sort((a, b) => b.recall_id - a.recall_id).slice(0, RECENT_WINDOW);
+    const recallMisses: number = recentRs.filter((r: any) => !r.covered).length;
     const practice_count = allScores.length;
     const avg_score = allScores.length ? allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length : null;
     const mastered = practice_count >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && recallMisses === 0;
