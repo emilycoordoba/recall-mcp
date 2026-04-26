@@ -268,7 +268,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       id, name,
       topic_groups(name),
       recalls(id, recalled_at, overall_score),
-      quick_review_sessions(id, reviewed_at),
+      quick_review_sessions(id, reviewed_at, overall_score),
       topic_subsections(
         id, name,
         recall_subsections(recall_id, covered, score),
@@ -292,7 +292,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
   return ((data ?? []) as any[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number }[] = t.recalls ?? [];
-      const qrs: { id: number; reviewed_at: string }[] = t.quick_review_sessions ?? [];
+      const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
 
       // Bug 2 fix: urgency uses only full recall dates; display uses any session date
       const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
@@ -310,10 +310,14 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         ? Math.floor((Date.now() - new Date(lastDate).getTime()) / 86_400_000)
         : null;
 
-      // Bug 1 fix: avg_score uses only the last RECENT_WINDOW full recalls
-      const recentRecalls = sortedRecalls.slice(0, RECENT_WINDOW);
-      const avgScore = recentRecalls.length
-        ? recentRecalls.reduce((s, r) => s + r.overall_score, 0) / recentRecalls.length
+      // Inconsistency fix: avg_score merges recall and QR overall scores (same logic as subsections)
+      const allSessions = [
+        ...recalls.map((r) => ({ date: r.recalled_at, score: r.overall_score })),
+        ...qrs.map((q) => ({ date: q.reviewed_at, score: q.overall_score })),
+      ].sort((a, b) => b.date.localeCompare(a.date));
+      const recentSessions = allSessions.slice(0, RECENT_WINDOW);
+      const avgScore = recentSessions.length
+        ? recentSessions.reduce((s, r) => s + r.score, 0) / recentSessions.length
         : null;
 
       // Bug 5 fix: consolidation factor — more recalls = topic can wait longer (logarithmic growth)
@@ -373,23 +377,34 @@ export async function saveTopicSubsections(input: SaveTopicSubsectionsInput) {
   const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
   const topicId = await getOrCreateTopic(input.topic_name, groupId);
 
-  const { count } = await supabase
-    .from("topic_subsections")
-    .select("id", { count: "exact", head: true })
-    .eq("topic_id", topicId);
-
-  const existingCount = count ?? 0;
-
+  // Upsert with correct order (updates order_index on existing subsections too)
   await supabase
     .from("topic_subsections")
     .upsert(
-      input.subsections.map((name, i) => ({
-        topic_id: topicId,
-        name,
-        order_index: existingCount + i,
-      })),
-      { onConflict: "topic_id,name", ignoreDuplicates: true },
+      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i })),
+      { onConflict: "topic_id,name", ignoreDuplicates: false },
     );
+
+  // Remove phantom subsections (not in new list, no practice history)
+  const { data: existing } = await supabase
+    .from("topic_subsections")
+    .select("id, name")
+    .eq("topic_id", topicId);
+
+  const newNameSet = new Set(input.subsections.map((n) => n.toLowerCase()));
+  const phantoms = (existing ?? []).filter((s) => !newNameSet.has(s.name.toLowerCase()));
+
+  await Promise.all(
+    phantoms.map(async (s) => {
+      const [{ count: recallCount }, { count: qrCount }] = await Promise.all([
+        supabase.from("recall_subsections").select("id", { count: "exact", head: true }).eq("subsection_id", s.id),
+        supabase.from("quick_review_answers").select("id", { count: "exact", head: true }).eq("subsection_id", s.id),
+      ]);
+      if ((recallCount ?? 0) === 0 && (qrCount ?? 0) === 0) {
+        await supabase.from("topic_subsections").delete().eq("id", s.id);
+      }
+    }),
+  );
 
   const { data: subsections } = await supabase
     .from("topic_subsections")
@@ -737,19 +752,20 @@ export async function getStats(): Promise<Stats> {
   const totalRecalls = recalls?.length ?? 0;
   const totalQRs = qrs?.length ?? 0;
 
-  // Promedio global de scores
-  const scored = (recalls ?? []).filter((r) => r.overall_score !== null);
-  const avgScore = scored.length
-    ? Math.round(scored.reduce((s, r) => s + r.overall_score!, 0) / scored.length * 100) / 100
-    : null;
-
-  // Último score por topic → cuántos están bajo 3.0
+  // Last score per topic (used for both avg and below-3 count)
   const lastScoreByTopic = new Map<number, number>();
   for (const r of [...(recalls ?? [])].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at))) {
     if (!lastScoreByTopic.has(r.topic_id) && r.overall_score !== null)
       lastScoreByTopic.set(r.topic_id, r.overall_score);
   }
-  const topicsBelow3 = [...lastScoreByTopic.values()].filter((s) => s < 3.0).length;
+
+  // getStats fix: avg_score = average of each topic's current score, not all-time history
+  const currentScores = [...lastScoreByTopic.values()];
+  const avgScore = currentScores.length
+    ? Math.round(currentScores.reduce((s, v) => s + v, 0) / currentScores.length * 100) / 100
+    : null;
+
+  const topicsBelow3 = currentScores.filter((s) => s < 3.0).length;
 
   // Topics sin ninguna sesión
   const sessionedIds = new Set([
