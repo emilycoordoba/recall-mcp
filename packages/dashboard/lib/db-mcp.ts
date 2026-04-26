@@ -419,23 +419,6 @@ export async function saveRecall(input: SaveRecallInput) {
   const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
   const topicId = await getOrCreateTopic(input.topic_name, groupId);
 
-  // Add any new subsections
-  const { count } = await supabase
-    .from("topic_subsections")
-    .select("id", { count: "exact", head: true })
-    .eq("topic_id", topicId);
-
-  await supabase
-    .from("topic_subsections")
-    .upsert(
-      input.subsections.map((s, i) => ({
-        topic_id: topicId,
-        name: s.name,
-        order_index: (count ?? 0) + i,
-      })),
-      { onConflict: "topic_id,name", ignoreDuplicates: true },
-    );
-
   const { data: recall, error: re } = await supabase
     .from("recalls")
     .insert({
@@ -647,6 +630,7 @@ export interface ReviewSlot {
   group_name: string | null;
   days_since_recall: number | null;
   avg_score: number | null;
+  total_recalls: number;
   target_subsection?: string;
   target_subsections?: string[];
 }
@@ -679,7 +663,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 1, purpose: "most_urgent", format: "quick",
       topic_id: s1.topic_id, topic_name: s1.topic_name, group_name: s1.group_name,
-      days_since_recall: s1.days_since_recall, avg_score: s1.avg_score,
+      days_since_recall: s1.days_since_recall, avg_score: s1.avg_score, total_recalls: s1.total_recalls,
       target_subsection: weakestQuickSubsection(s1),
     });
   }
@@ -691,7 +675,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 2, purpose: "persistent_failure", format: "recall_dirigido",
       topic_id: s2.topic_id, topic_name: s2.topic_name, group_name: s2.group_name,
-      days_since_recall: s2.days_since_recall, avg_score: s2.avg_score,
+      days_since_recall: s2.days_since_recall, avg_score: s2.avg_score, total_recalls: s2.total_recalls,
       target_subsections: weakestRecallSubsections(s2),
     });
   } else {
@@ -701,7 +685,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
       slots.push({
         slot: 2, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
-        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score,
+        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
         target_subsection: weakestQuickSubsection(fallback),
       });
     }
@@ -719,7 +703,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 3, purpose: "consolidation", format: "quick",
       topic_id: s3.topic_id, topic_name: s3.topic_name, group_name: s3.group_name,
-      days_since_recall: s3.days_since_recall, avg_score: s3.avg_score,
+      days_since_recall: s3.days_since_recall, avg_score: s3.avg_score, total_recalls: s3.total_recalls,
       target_subsection: weakestQuickSubsection(s3),
     });
   } else {
@@ -729,7 +713,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
       slots.push({
         slot: 3, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
-        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score,
+        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
         target_subsection: weakestQuickSubsection(fallback),
       });
     }

@@ -156,6 +156,28 @@ export async function getSubsections(topicId: number): Promise<Subsection[]> {
   return (data ?? []) as Subsection[];
 }
 
+export interface SubsectionStat extends Subsection {
+  practice_count: number;
+}
+
+export async function getSubsectionStats(topicId: number): Promise<SubsectionStat[]> {
+  const { data, error } = await supabase
+    .from("topic_subsections")
+    .select("id, topic_id, name, order_index, recall_subsections(id), quick_review_answers(id)")
+    .eq("topic_id", topicId)
+    .order("order_index");
+
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((s) => ({
+    id: s.id,
+    topic_id: s.topic_id,
+    name: s.name,
+    order_index: s.order_index,
+    practice_count: (s.recall_subsections?.length ?? 0) + (s.quick_review_answers?.length ?? 0),
+  }));
+}
+
 export async function getRecalls(topicId: number): Promise<RecallRow[]> {
   const { data, error } = await supabase
     .from("recalls")

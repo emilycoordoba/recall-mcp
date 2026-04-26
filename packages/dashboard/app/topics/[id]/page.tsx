@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getTopic, getSubsections, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
+import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BackButton } from "@/components/back-button"
@@ -18,7 +18,7 @@ export default async function TopicPage({
 
   const [topic, subsections, rawRecalls, rawQuickReviews] = await Promise.all([
     getTopic(topicId),
-    getSubsections(topicId),
+    getSubsectionStats(topicId),
     getRecalls(topicId),
     getQuickReviews(topicId),
   ])
@@ -77,7 +77,12 @@ export default async function TopicPage({
                   <span className="w-5 text-right font-mono text-xs text-muted-foreground">
                     {i + 1}.
                   </span>
-                  {s.name}
+                  <span className="flex-1">{s.name}</span>
+                  {s.practice_count > 0 && (
+                    <span className="font-mono text-xs text-muted-foreground">
+                      ×{s.practice_count}
+                    </span>
+                  )}
                 </li>
               ))}
             </ol>
