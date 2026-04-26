@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select"
 import type { TopicRow } from "@/lib/db"
 
-type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc"
+type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc"
 
 function formatDate(iso: string | null) {
   if (!iso) return "—"
@@ -43,6 +43,13 @@ function ScoreBadge({ score }: { score: number | null }) {
   if (score >= 3.0)
     return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-transparent">{score.toFixed(1)}</Badge>
   return <Badge variant="destructive">{score.toFixed(1)}</Badge>
+}
+
+function TrendIndicator({ trend }: { trend: "up" | "down" | "flat" | null }) {
+  if (trend === null) return null
+  if (trend === "up")   return <span className="text-xs text-green-600 dark:text-green-400">↑</span>
+  if (trend === "down") return <span className="text-xs text-destructive">↓</span>
+  return <span className="text-xs text-muted-foreground">→</span>
 }
 
 interface Props {
@@ -69,9 +76,11 @@ export function DashboardFilters({ topics, groups }: Props) {
         case "date_desc":    return (b.last_recalled_at ?? "").localeCompare(a.last_recalled_at ?? "")
         case "days_desc":    return (daysSince(b.last_recalled_at) ?? -1) - (daysSince(a.last_recalled_at) ?? -1)
         case "days_asc":     return (daysSince(a.last_recalled_at) ?? -1) - (daysSince(b.last_recalled_at) ?? -1)
-        case "recalls_desc": return b.total_recalls - a.total_recalls
-        case "recalls_asc":  return a.total_recalls - b.total_recalls
-        default:             return a.name.localeCompare(b.name)
+        case "recalls_desc":  return b.total_recalls - a.total_recalls
+        case "recalls_asc":   return a.total_recalls - b.total_recalls
+        case "urgency_desc":  return b.urgency - a.urgency
+        case "urgency_asc":   return a.urgency - b.urgency
+        default:              return a.name.localeCompare(b.name)
       }
     })
 
@@ -112,6 +121,8 @@ export function DashboardFilters({ topics, groups }: Props) {
             <SelectItem value="days_asc">Sort: Días ↑</SelectItem>
             <SelectItem value="recalls_desc">Sort: Recalls ↓</SelectItem>
             <SelectItem value="recalls_asc">Sort: Recalls ↑</SelectItem>
+            <SelectItem value="urgency_desc">Sort: Urgencia ↓</SelectItem>
+            <SelectItem value="urgency_asc">Sort: Urgencia ↑</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -157,7 +168,10 @@ export function DashboardFilters({ topics, groups }: Props) {
                         : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell className="text-center">
-                      <ScoreBadge score={topic.last_score} />
+                      <span className="inline-flex items-center gap-1">
+                        <ScoreBadge score={topic.last_score} />
+                        <TrendIndicator trend={topic.score_trend} />
+                      </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(topic.last_recalled_at)}

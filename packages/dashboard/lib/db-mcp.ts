@@ -759,14 +759,16 @@ export async function getStats(): Promise<Stats> {
   ]);
   const topicsNeverRecalled = (topics ?? []).filter((t) => !sessionedIds.has(t.id)).length;
 
-  // Racha de días consecutivos hasta hoy
+  // Racha de días consecutivos hasta hoy (fechas locales, no UTC)
+  const localDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const allDays = new Set([
-    ...(recalls ?? []).map((r) => r.recalled_at.slice(0, 10)),
-    ...(qrs ?? []).map((q) => q.reviewed_at.slice(0, 10)),
+    ...(recalls ?? []).map((r) => localDate(new Date(r.recalled_at))),
+    ...(qrs ?? []).map((q) => localDate(new Date(q.reviewed_at))),
   ]);
   let streak = 0;
   const cur = new Date();
-  while (allDays.has(cur.toISOString().slice(0, 10))) {
+  while (allDays.has(localDate(cur))) {
     streak++;
     cur.setDate(cur.getDate() - 1);
   }

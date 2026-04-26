@@ -1,5 +1,11 @@
 import { supabase } from "./supabase";
 
+const RECENT_WINDOW = 5;
+
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export interface TopicRow {
   id: number;
   name: string;
@@ -11,6 +17,8 @@ export interface TopicRow {
   last_recalled_at: string | null;
   total_recalls: number;
   total_quick_reviews: number;
+  urgency: number;
+  score_trend: "up" | "down" | "flat" | null;
 }
 
 export interface TopicDetail {
@@ -71,13 +79,13 @@ export async function getStudyStreak(): Promise<number> {
   ]);
 
   const allDays = new Set([
-    ...(recalls ?? []).map((r) => r.recalled_at.slice(0, 10)),
-    ...(qrs ?? []).map((q) => q.reviewed_at.slice(0, 10)),
+    ...(recalls ?? []).map((r) => localDateStr(new Date(r.recalled_at))),
+    ...(qrs ?? []).map((q) => localDateStr(new Date(q.reviewed_at))),
   ]);
 
   let streak = 0;
   const cur = new Date();
-  while (allDays.has(cur.toISOString().slice(0, 10))) {
+  while (allDays.has(localDateStr(cur))) {
     streak++;
     cur.setDate(cur.getDate() - 1);
   }
@@ -101,14 +109,46 @@ export async function getTopics(): Promise<TopicRow[]> {
     const recalls = (t.recalls as { overall_score: number; recalled_at: string }[]) ?? [];
     const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number }[]) ?? [];
 
-    const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
-    const lastRecall = sortedRecalls[0] ?? null;
+    // All sessions sorted most recent first
+    const allSessions = [
+      ...recalls.map((r) => ({ date: r.recalled_at, score: r.overall_score })),
+      ...qrs.map((q) => ({ date: q.reviewed_at, score: q.overall_score })),
+    ].sort((a, b) => b.date.localeCompare(a.date));
 
-    const allDates = [
-      ...recalls.map((r) => r.recalled_at),
-      ...qrs.map((qr) => qr.reviewed_at),
-    ].filter(Boolean).sort();
-    const lastRecalledAt = allDates.at(-1) ?? null;
+    const lastRecalledAt = allSessions[0]?.date ?? null;
+
+    // Item 10: last_score from most recent session (recall or QR)
+    const last_score = allSessions[0]?.score ?? null;
+
+    // Urgency — same formula as getReviewCandidates
+    const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
+    const lastRecallDate = sortedRecalls[0]?.recalled_at ?? null;
+    const daysSinceFullRecall = lastRecallDate
+      ? Math.floor((Date.now() - new Date(lastRecallDate).getTime()) / 86_400_000)
+      : null;
+    const daysSinceAny = lastRecalledAt
+      ? Math.floor((Date.now() - new Date(lastRecalledAt).getTime()) / 86_400_000)
+      : null;
+    const recentSessions = allSessions.slice(0, RECENT_WINDOW);
+    const avgScore = recentSessions.length
+      ? recentSessions.reduce((s, r) => s + r.score, 0) / recentSessions.length
+      : null;
+    const consolidation = Math.log(recalls.length + Math.E);
+    const urgencyDays = daysSinceFullRecall ?? daysSinceAny ?? 0;
+    const urgency = recalls.length === 0 && qrs.length === 0
+      ? 999
+      : Math.round((urgencyDays / ((avgScore ?? 0) + 1) / consolidation) * 100) / 100;
+
+    // Item 4: score trend — last 3 sessions vs previous 3
+    let score_trend: "up" | "down" | "flat" | null = null;
+    if (allSessions.length >= 4) {
+      const recent = allSessions.slice(0, 3);
+      const prev = allSessions.slice(3, 6);
+      const recentAvg = recent.reduce((s, r) => s + r.score, 0) / recent.length;
+      const prevAvg = prev.reduce((s, r) => s + r.score, 0) / prev.length;
+      const diff = recentAvg - prevAvg;
+      score_trend = diff > 0.3 ? "up" : diff < -0.3 ? "down" : "flat";
+    }
 
     return {
       id: t.id,
@@ -117,10 +157,12 @@ export async function getTopics(): Promise<TopicRow[]> {
       created_at: t.created_at,
       group_id: t.group_id,
       group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
-      last_score: lastRecall?.overall_score ?? null,
+      last_score,
       last_recalled_at: lastRecalledAt,
       total_recalls: recalls.length,
       total_quick_reviews: qrs.length,
+      urgency,
+      score_trend,
     };
   });
 }
