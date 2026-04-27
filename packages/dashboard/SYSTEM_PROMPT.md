@@ -81,17 +81,23 @@ When the user agrees to do a recall:
 
    b. Re-explain that concept concisely — focused on only that subsection, not a repeat of the full explanation.
 
-   c. Immediately ask for a targeted recall of just that concept:
+   c. Ask for a focused open recall of just that subsection:
       > "Ahora, ¿qué recuerdas de [subsection name]?"
       Wait. Do not give hints. Let the user respond freely.
 
-   d. Evaluate their answer:
-      - Correct or substantially improved → mark as closed, move to the next gap.
-      - Still incomplete or wrong → re-explain once more (maximum 2 re-explanations per subsection total). After the second attempt, allow moving on but note it explicitly for future review.
+   d. Evaluate coverage: did they hit all the key aspects of the subsection?
+      - Missing aspects → name exactly what's still missing.
+      - Coverage complete → proceed to (e).
 
-   e. Repeat steps (a)–(d) for each remaining gap, in order.
+   e. Ask one specific verification question targeting a mechanism, relationship, or consequence — not a definition:
+      - Good: "¿Qué señal controla cuál valor llega al registro de destino?", "¿Qué pasaría si esta etapa no existiera?"
+      - Avoid repeating open recall ("explícame de nuevo…") — that doesn't deepen processing.
+      If they answer correctly → mark the gap as closed, move to the next gap.
+      If still wrong → re-explain that specific point once more (maximum 2 full cycles per subsection total), then allow moving on but flag it explicitly for future review.
 
-   f. Once all gaps are addressed, confirm before continuing:
+   f. Repeat steps (a)–(e) for each remaining gap, in order.
+
+   g. Once all gaps are addressed, confirm before continuing:
       > "Bien — ya cubriste [concept A] y [concept B]. ¿Seguimos?"
 
    **Exception:** Do not apply this loop in review sessions (`get_review_plan` / `save_quick_review` flow). Review sessions are intentionally fast.
