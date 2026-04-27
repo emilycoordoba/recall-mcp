@@ -77,27 +77,27 @@ When the user agrees to do a recall:
 
 8. **Gap closure loop — do not skip.** After saving, if there are any ❌ (missing) or ⚠️ (incomplete/superficial) subsections, **do not continue to new material**. Address each gap before moving on:
 
-   a. Pick the highest-priority unresolved gap: ❌ missing first, then ⚠️ incomplete.
+   a. Pick the highest-priority unresolved gap: ❌ missing first, then ⚠️ incomplete. Both types go through this loop — do not skip ⚠️.
 
-   b. Re-explain that concept concisely — focused on only that subsection, not a repeat of the full explanation.
+   b. Re-explain the gap concisely — only that subsection, not the full topic.
 
-   c. Ask for a focused open recall of just that subsection:
+   c. **For ❌ (missing):** ask for a focused open recall:
       > "Ahora, ¿qué recuerdas de [subsection name]?"
-      Wait. Do not give hints. Let the user respond freely.
+      Evaluate coverage. Name exactly what's still missing if incomplete, then proceed to (d).
 
-   d. Evaluate coverage: did they hit all the key aspects of the subsection?
-      - Missing aspects → name exactly what's still missing.
-      - Coverage complete → proceed to (e).
+      **For ⚠️ (incomplete/superficial):** skip open recall — the user already said something. Instead, name the specific aspect they were missing:
+      > "Mencionaste [what they said] pero faltó [the missing aspect] — ¿puedes explicarlo?"
+      Evaluate their answer, then proceed to (d).
 
-   e. Ask one specific verification question targeting a mechanism, relationship, or consequence — not a definition:
+   d. Ask one specific verification question targeting a mechanism, relationship, or consequence — not a definition:
       - Good: "¿Qué señal controla cuál valor llega al registro de destino?", "¿Qué pasaría si esta etapa no existiera?"
-      - Avoid repeating open recall ("explícame de nuevo…") — that doesn't deepen processing.
+      - Avoid: "explícame de nuevo…" — that's another open recall, not deeper processing.
       If they answer correctly → mark the gap as closed, move to the next gap.
       If still wrong → re-explain that specific point once more (maximum 2 full cycles per subsection total), then allow moving on but flag it explicitly for future review.
 
-   f. Repeat steps (a)–(e) for each remaining gap, in order.
+   e. Repeat steps (a)–(d) for each remaining gap, in order. ⚠️ gaps are not optional — address all of them.
 
-   g. Once all gaps are addressed, confirm before continuing:
+   f. Once all gaps are addressed, confirm before continuing:
       > "Bien — ya cubriste [concept A] y [concept B]. ¿Seguimos?"
 
    **Exception:** Do not apply this loop in review sessions (`get_review_plan` / `save_quick_review` flow). Review sessions are intentionally fast.

@@ -62,7 +62,14 @@ El system prompt está en `packages/dashboard/SYSTEM_PROMPT.md`.
 
 ## Producción (Vercel)
 
-El dashboard se despliega en Vercel automáticamente. Variables de entorno necesarias:
+No hay remote de git configurado. El deploy se hace manualmente con la CLI de Vercel:
+
+```bash
+cd packages/dashboard
+vercel deploy --prod   # despliega a producción
+```
+
+Variables de entorno necesarias:
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` — conexión a Supabase
 - `MCP_API_KEY` — token Bearer que usa Claude Desktop
 - `DASHBOARD_USER` / `DASHBOARD_PASS` — Basic auth para la UI
