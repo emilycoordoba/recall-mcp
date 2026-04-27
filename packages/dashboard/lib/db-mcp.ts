@@ -375,14 +375,14 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
           .sort((a, b) => a.date.localeCompare(b.date))
           .slice(-RECENT_WINDOW);
 
-        // times_missed only from recalls — quick reviews have no "covered" concept
-        const sortedRs = [...rs].sort((a, b) =>
-          (recallDateMap.get(a.recall_id) ?? "").localeCompare(recallDateMap.get(b.recall_id) ?? ""),
-        );
-        const recentRs = sortedRs.slice(-RECENT_WINDOW);
+        // times_missed: recalls (covered field) + QRs (score >= 3.5 → covered)
+        const coverageEntries = [
+          ...rs.map((r) => ({ date: recallDateMap.get(r.recall_id) ?? "", covered: r.covered })),
+          ...qas.map((q) => ({ date: qrDateMap.get(q.session_id) ?? "", covered: q.score >= 3.5 })),
+        ].sort((a, b) => a.date.localeCompare(b.date)).slice(-RECENT_WINDOW);
 
         const avg_score = allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null;
-        const times_missed = recentRs.filter((r) => !r.covered).length;
+        const times_missed = coverageEntries.filter((e) => !e.covered).length;
         const mastered = allEntries.length >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && times_missed === 0;
         return { name: s.name, avg_score, times_missed, mastered };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
