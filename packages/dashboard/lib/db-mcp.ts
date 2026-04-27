@@ -356,7 +356,9 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       const todayIso = new Date().toISOString().slice(0, 10);
       const daysOverdue = nextReviewDate
         ? Math.round((Date.parse(todayIso) - Date.parse(nextReviewDate)) / 86_400_000)
-        : recalls.length === 0 ? 999 : 0;
+        : recalls.length === 0 && qrs.length === 0 ? 999
+        : recalls.length === 0 ? (daysSince ?? 30)
+        : 0;
 
       // Maps for cross-referencing session dates in subsection calculations
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
