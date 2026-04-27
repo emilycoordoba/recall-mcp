@@ -75,6 +75,29 @@ When the user agrees to do a recall:
 
 7. **Call `save_recall`** with all the data: topic name, group (if applicable), transcript of what the user said, your feedback text, overall score, and per-subsection results. The `feedback` field must contain the exact structured feedback you showed the user (✅ ⚠️ ❌ 🔴 format) — not a rephrased summary.
 
+8. **Gap closure loop — do not skip.** After saving, if there are any ❌ (missing) or ⚠️ (incomplete/superficial) subsections, **do not continue to new material**. Address each gap before moving on:
+
+   a. Pick the highest-priority unresolved gap: ❌ missing first, then ⚠️ incomplete.
+
+   b. Re-explain that concept concisely — focused on only that subsection, not a repeat of the full explanation.
+
+   c. Immediately ask for a targeted recall of just that concept:
+      > "Ahora, ¿qué recuerdas de [subsection name]?"
+      Wait. Do not give hints. Let the user respond freely.
+
+   d. Evaluate their answer:
+      - Correct or substantially improved → mark as closed, move to the next gap.
+      - Still incomplete or wrong → re-explain once more (maximum 2 re-explanations per subsection total). After the second attempt, allow moving on but note it explicitly for future review.
+
+   e. Repeat steps (a)–(d) for each remaining gap, in order.
+
+   f. Once all gaps are addressed, confirm before continuing:
+      > "Bien — ya cubriste [concept A] y [concept B]. ¿Seguimos?"
+
+   **Exception:** Do not apply this loop in review sessions (`get_review_plan` / `save_quick_review` flow). Review sessions are intentionally fast.
+
+   **Cap:** No more than 3 gap-closure cycles in a single session. If significant gaps remain after 3 cycles, note it and let the user decide whether to continue or stop.
+
 ---
 
 ## Dense explanations
@@ -127,9 +150,9 @@ If the topic exists under any of those queries, mention it naturally:
 
 When the user says "quiero repasar", "sesión de repaso", or similar:
 
-1. Call `get_review_plan` — it returns 3 slots already computed with topic, format, and target subsections.
+1. Call `get_review_plan` — it returns up to 4 slots already computed with topic, format, and target subsections.
 
-2. Execute each slot in order. Two possible formats:
+2. Execute each slot in order. Three possible formats:
 
    **Quick** (`format: "quick"`):
    - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
@@ -143,9 +166,16 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    - Wait. Let the user respond freely — no hints, no guiding questions.
    - Evaluate only the targeted subsections. Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown). + score per subsection.
 
-3. After all 3 slots, save:
+   **Recall completo** (`format: "recall_completo"`) — slot 4 only:
+   - This is a full free recall. Say: *"Okay — cuéntame todo lo que recuerdas sobre [topic]."*
+   - Wait. Let the user respond freely without hints or guiding questions.
+   - Evaluate against the full table of contents (all subsections). Give structured feedback (✅⚠️❌🔴 format, same as a normal recall) + score per subsection + overall score.
+   - This slot feeds SM-2 — treat it exactly like a normal recall but without the preliminary questions ("any questions?").
+
+3. After all slots, save:
    - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)
    - Recall dirigido slot → `save_recall` (targeted subsections only — do NOT call `save_topic_subsections` first)
+   - Recall completo slot → `save_recall` (all subsections, full feedback — do NOT call `save_topic_subsections` first)
 
 4. Give a **brief session summary** (2–4 lines total, after saving):
    - One line per topic: score + what was strong + what still needs work.

@@ -55,6 +55,7 @@ export interface ReviewCandidate {
   topic_name: string;
   group_name: string | null;
   days_since_recall: number | null;
+  days_since_full_recall: number | null;
   avg_score: number | null;
   urgency: number;
   total_recalls: number;
@@ -389,6 +390,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         topic_name: t.name,
         group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
         days_since_recall: daysSince,
+        days_since_full_recall: daysSinceFullRecall,
         avg_score: avgScore !== null ? Math.round(avgScore * 100) / 100 : null,
         urgency: Math.round(urgency * 100) / 100,
         total_recalls: recalls.length,
@@ -652,13 +654,14 @@ export async function deleteTopic(topicName: string) {
 }
 
 export interface ReviewSlot {
-  slot: 1 | 2 | 3;
-  purpose: "most_urgent" | "persistent_failure" | "consolidation" | "fallback";
-  format: "quick" | "recall_dirigido";
+  slot: 1 | 2 | 3 | 4;
+  purpose: "most_urgent" | "persistent_failure" | "consolidation" | "full_recall" | "fallback";
+  format: "quick" | "recall_dirigido" | "recall_completo";
   topic_id: number;
   topic_name: string;
   group_name: string | null;
   days_since_recall: number | null;
+  days_since_full_recall: number | null;
   avg_score: number | null;
   total_recalls: number;
   target_subsection?: string;
@@ -696,7 +699,8 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 1, purpose: "most_urgent", format: "quick",
       topic_id: s1.topic_id, topic_name: s1.topic_name, group_name: s1.group_name,
-      days_since_recall: s1.days_since_recall, avg_score: s1.avg_score, total_recalls: s1.total_recalls,
+      days_since_recall: s1.days_since_recall, days_since_full_recall: s1.days_since_full_recall,
+      avg_score: s1.avg_score, total_recalls: s1.total_recalls,
       target_subsection: weakestQuickSubsection(s1),
     });
   }
@@ -708,7 +712,8 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 2, purpose: "persistent_failure", format: "recall_dirigido",
       topic_id: s2.topic_id, topic_name: s2.topic_name, group_name: s2.group_name,
-      days_since_recall: s2.days_since_recall, avg_score: s2.avg_score, total_recalls: s2.total_recalls,
+      days_since_recall: s2.days_since_recall, days_since_full_recall: s2.days_since_full_recall,
+      avg_score: s2.avg_score, total_recalls: s2.total_recalls,
       target_subsections: weakestRecallSubsections(s2),
     });
   } else {
@@ -718,7 +723,8 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
       slots.push({
         slot: 2, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
-        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
+        days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
+        avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
         target_subsection: weakestQuickSubsection(fallback),
       });
     }
@@ -736,7 +742,8 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     slots.push({
       slot: 3, purpose: "consolidation", format: "quick",
       topic_id: s3.topic_id, topic_name: s3.topic_name, group_name: s3.group_name,
-      days_since_recall: s3.days_since_recall, avg_score: s3.avg_score, total_recalls: s3.total_recalls,
+      days_since_recall: s3.days_since_recall, days_since_full_recall: s3.days_since_full_recall,
+      avg_score: s3.avg_score, total_recalls: s3.total_recalls,
       target_subsection: weakestQuickSubsection(s3),
     });
   } else {
@@ -746,10 +753,27 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
       slots.push({
         slot: 3, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
-        days_since_recall: fallback.days_since_recall, avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
+        days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
+        avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
         target_subsection: weakestQuickSubsection(fallback),
       });
     }
+  }
+
+  // Slot 4: recall completo — el topic con más días sin recall completo (≥1 recall previo)
+  // Sorted by days_since_full_recall desc (null = nunca → máxima prioridad)
+  const fullRecallPool = candidates
+    .filter((c) => !used.has(c.topic_id) && c.total_recalls >= 1)
+    .sort((a, b) => (b.days_since_full_recall ?? Infinity) - (a.days_since_full_recall ?? Infinity));
+  const s4 = fullRecallPool[0] ?? candidates.find((c) => !used.has(c.topic_id));
+  if (s4) {
+    used.add(s4.topic_id);
+    slots.push({
+      slot: 4, purpose: "full_recall", format: "recall_completo",
+      topic_id: s4.topic_id, topic_name: s4.topic_name, group_name: s4.group_name,
+      days_since_recall: s4.days_since_recall, days_since_full_recall: s4.days_since_full_recall,
+      avg_score: s4.avg_score, total_recalls: s4.total_recalls,
+    });
   }
 
   return { slots };
