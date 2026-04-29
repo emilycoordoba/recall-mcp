@@ -14,6 +14,7 @@ export interface SaveRecallInput {
   transcript?: string;
   feedback?: string;
   overall_score: number;
+  format?: "completo" | "dirigido";
   subsections: SubsectionInput[];
 }
 
@@ -271,7 +272,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
     .select(`
       id, name,
       topic_groups(name),
-      recalls(id, recalled_at, overall_score),
+      recalls(id, recalled_at, overall_score, format),
       quick_review_sessions(id, reviewed_at, overall_score),
       topic_subsections(
         id, name,
@@ -295,7 +296,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
   return ((data ?? []) as any[])
     .map((t) => {
-      const recalls: { id: number; recalled_at: string; overall_score: number }[] = t.recalls ?? [];
+      const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
       const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
 
       // Bug 2 fix: urgency uses only full recall dates; display uses any session date
@@ -333,8 +334,10 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
           ? 999
           : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
-      // SM-2: compute interval from full recall history (chronological)
-      const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+      // SM-2: only full recalls count toward interval — directed recalls are partial and don't evidence full retention
+      const sortedForSM2 = recalls
+        .filter((r) => (r.format ?? "completo") === "completo")
+        .sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
       let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
       for (const r of sortedForSM2) {
         const q = r.overall_score ?? 0;
@@ -460,6 +463,7 @@ export async function saveRecall(input: SaveRecallInput) {
       transcript: input.transcript ?? null,
       feedback: input.feedback ?? null,
       overall_score: input.overall_score,
+      format: input.format ?? "completo",
     })
     .select("id")
     .single();

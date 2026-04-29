@@ -147,6 +147,7 @@ export function createMcpServer(): McpServer {
       transcript:    z.string().optional().describe("Texto literal del recall del usuario"),
       feedback:      z.string().optional().describe("Retroalimentación de la IA"),
       overall_score: z.number().min(0).max(5).describe("Puntuación global (0.0–5.0)"),
+      format:        z.enum(["completo", "dirigido"]).optional().describe("Tipo de recall: 'completo' = recall libre de todo el topic (default, alimenta SM-2). 'dirigido' = solo subsecciones débiles, NO avanza el intervalo SM-2."),
       subsections: z.array(z.object({
         name:    z.string(),
         covered: z.boolean(),

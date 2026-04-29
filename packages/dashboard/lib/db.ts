@@ -102,7 +102,7 @@ export async function getTopics(): Promise<TopicRow[]> {
     .select(`
       id, name, description, created_at, group_id,
       topic_groups(name),
-      recalls(overall_score, recalled_at),
+      recalls(overall_score, recalled_at, format),
       quick_review_sessions(reviewed_at, overall_score)
     `)
     .order("name");
@@ -110,7 +110,7 @@ export async function getTopics(): Promise<TopicRow[]> {
   if (error) throw error;
 
   return (data ?? []).map((t) => {
-    const recalls = (t.recalls as { overall_score: number; recalled_at: string }[]) ?? [];
+    const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
     const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number }[]) ?? [];
 
     // All sessions sorted most recent first
@@ -154,8 +154,10 @@ export async function getTopics(): Promise<TopicRow[]> {
       score_trend = diff > 0.3 ? "up" : diff < -0.3 ? "down" : "flat";
     }
 
-    // SM-2: compute interval from full recall history (chronological)
-    const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+    // SM-2: only full recalls count toward interval — directed recalls are partial and don't evidence full retention
+    const sortedForSM2 = recalls
+      .filter((r) => (r.format ?? "completo") === "completo")
+      .sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
     let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
     for (const r of sortedForSM2) {
       const q = r.overall_score ?? 0;
