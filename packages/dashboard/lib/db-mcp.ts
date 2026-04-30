@@ -63,7 +63,7 @@ export interface ReviewCandidate {
   next_review_date: string | null;
   days_overdue: number;
   sm2_interval: number;
-  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean }[];
+  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -277,7 +277,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       topic_subsections(
         id, name,
         recall_subsections(recall_id, covered, score),
-        quick_review_answers(session_id, score)
+        quick_review_answers(session_id, score, question)
       )
     `)
     .order("name");
@@ -369,7 +369,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
       const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
         const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
-        const qas: { session_id: number; score: number }[] = s.quick_review_answers ?? [];
+        const qas: { session_id: number; score: number; question: string | null }[] = s.quick_review_answers ?? [];
 
         // Bug 3 fix: avg_score merges recall and quick review scores, ordered by session date
         const recallEntries = rs.map((r) => ({ date: recallDateMap.get(r.recall_id) ?? "", score: r.score }));
@@ -387,7 +387,12 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         const avg_score = allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null;
         const times_missed = recentRs.filter((r) => !r.covered).length;
         const mastered = allEntries.length >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && times_missed === 0;
-        return { name: s.name, avg_score, times_missed, mastered };
+        const recent_questions = [...qas]
+          .sort((a, b) => (qrDateMap.get(b.session_id) ?? "").localeCompare(qrDateMap.get(a.session_id) ?? ""))
+          .slice(0, 5)
+          .map((q) => q.question)
+          .filter((q): q is string => q !== null);
+        return { name: s.name, avg_score, times_missed, mastered, recent_questions };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
 
       return {
@@ -672,6 +677,7 @@ export interface ReviewSlot {
   total_recalls: number;
   target_subsection?: string;
   target_subsections?: string[];
+  recent_questions?: string[];
 }
 
 export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; message?: string }> {
@@ -685,6 +691,10 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     const ranked = [...(pool.length > 0 ? pool : c.subsections)]
       .sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
     return ranked[0]?.name ?? "general";
+  }
+
+  function recentQuestionsFor(c: ReviewCandidate, subsectionName: string): string[] {
+    return c.subsections.find((s) => s.name === subsectionName)?.recent_questions ?? [];
   }
 
   function weakestRecallSubsections(c: ReviewCandidate): string[] {
@@ -702,12 +712,14 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   const s1 = candidates.find((c) => !used.has(c.topic_id));
   if (s1) {
     used.add(s1.topic_id);
+    const s1Target = weakestQuickSubsection(s1);
     slots.push({
       slot: 1, purpose: "most_urgent", format: "quick",
       topic_id: s1.topic_id, topic_name: s1.topic_name, group_name: s1.group_name,
       days_since_recall: s1.days_since_recall, days_since_full_recall: s1.days_since_full_recall,
       avg_score: s1.avg_score, total_recalls: s1.total_recalls,
-      target_subsection: weakestQuickSubsection(s1),
+      target_subsection: s1Target,
+      recent_questions: recentQuestionsFor(s1, s1Target),
     });
   }
 
@@ -726,12 +738,14 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     const fallback = candidates.find((c) => !used.has(c.topic_id));
     if (fallback) {
       used.add(fallback.topic_id);
+      const fbTarget = weakestQuickSubsection(fallback);
       slots.push({
         slot: 2, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
         days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
         avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
-        target_subsection: weakestQuickSubsection(fallback),
+        target_subsection: fbTarget,
+        recent_questions: recentQuestionsFor(fallback, fbTarget),
       });
     }
   }
@@ -745,23 +759,27 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   );
   if (s3) {
     used.add(s3.topic_id);
+    const s3Target = weakestQuickSubsection(s3);
     slots.push({
       slot: 3, purpose: "consolidation", format: "quick",
       topic_id: s3.topic_id, topic_name: s3.topic_name, group_name: s3.group_name,
       days_since_recall: s3.days_since_recall, days_since_full_recall: s3.days_since_full_recall,
       avg_score: s3.avg_score, total_recalls: s3.total_recalls,
-      target_subsection: weakestQuickSubsection(s3),
+      target_subsection: s3Target,
+      recent_questions: recentQuestionsFor(s3, s3Target),
     });
   } else {
     const fallback = candidates.find((c) => !used.has(c.topic_id));
     if (fallback) {
       used.add(fallback.topic_id);
+      const fbTarget = weakestQuickSubsection(fallback);
       slots.push({
         slot: 3, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
         days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
         avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
-        target_subsection: weakestQuickSubsection(fallback),
+        target_subsection: fbTarget,
+        recent_questions: recentQuestionsFor(fallback, fbTarget),
       });
     }
   }

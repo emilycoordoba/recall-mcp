@@ -162,6 +162,7 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
 
    **Quick** (`format: "quick"`):
    - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
+   - If `recent_questions` is provided and non-empty, you MUST ask a question that covers a different angle than any of those. Do not reuse or paraphrase them.
    - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0).
    - Example:
    > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
