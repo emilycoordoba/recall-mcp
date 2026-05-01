@@ -36,7 +36,7 @@ Si no hay ningún topic con fallos persistentes, el slot cae a fallback: una qui
 **Formato normal:** `quick`  
 **Formato fallback:** `quick`
 
-Busca un topic con buen historial (`recalls >= 3`, `avg_score >= 3.5`) que no se ha tocado en al menos 7 días. La intención es reforzarlo antes de que empiece a olvidarse, aunque todavía no esté en zona roja de urgencia.
+Busca un topic con buen historial (`recalls >= 1`, `avg_score >= 3.5`) que no se ha tocado en al menos 7 días. La intención es reforzarlo antes de que empiece a olvidarse, aunque todavía no esté en zona roja de urgencia.
 
 Misma mecánica que slot 1: una pregunta, feedback breve, score. Se guarda con `save_quick_review`.
 
@@ -107,7 +107,7 @@ days_overdue = hoy − next_review_date
 
 ### Slot 3 — consolidación
 
-- El primer topic no usado con `total_recalls >= 3`, `avg_score >= 3.5` y `days_since_recall >= 7`.
+- El primer topic no usado con `total_recalls >= 1`, `avg_score >= 3.5` y `days_since_recall >= 7`.
 - Si ninguno cumple, fallback al siguiente más urgente.
 
 ### Slot 4 — recall completo
@@ -143,7 +143,7 @@ Excluye las que tienen `avg_score >= 4.0` (umbral suave).
 | 1 | Más urgente | quick | Mayor `days_overdue` (cooldown 2 sesiones) | Bottom-3 rotando | No |
 | 2 | Fallo persistente | recall_dirigido | Sub con `missed >= 2` y `score < 4` | Top-3 más fallidas | No |
 | 2 | (fallback) | quick | Siguiente en ranking | Bottom-3 rotando | No |
-| 3 | Consolidación | quick | `recalls >= 3`, `score >= 3.5`, `días >= 7` | Bottom-3 rotando | No |
+| 3 | Consolidación | quick | `recalls >= 1`, `score >= 3.5`, `días >= 7` | Bottom-3 rotando | No |
 | 3 | (fallback) | quick | Siguiente en ranking | Bottom-3 rotando | No |
 | 4 | Recall completo | recall_completo | Mayor `days_since_full_recall` | — (topic entero) | **Sí** |
 

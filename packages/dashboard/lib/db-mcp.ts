@@ -785,7 +785,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   // Slot 3: consolidación (practicado ≥3 veces, bien aprendido, sin tocar ≥7 días)
   const s3 = candidates.find((c) =>
     !used.has(c.topic_id) &&
-    c.total_recalls >= 3 &&
+    c.total_recalls >= 1 &&
     c.avg_score !== null && c.avg_score >= 3.5 &&
     c.days_since_recall !== null && c.days_since_recall >= 7,
   );
