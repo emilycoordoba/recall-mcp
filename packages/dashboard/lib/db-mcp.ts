@@ -680,17 +680,48 @@ export interface ReviewSlot {
   recent_questions?: string[];
 }
 
-export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; message?: string }> {
-  const candidates = await getReviewCandidates(groupName);
+// How many recent sessions slot-1 topics are excluded from slot 1 again.
+// 2 means: if a topic was slot 1 in either of the last 2 sessions, skip it.
+const SLOT1_COOLDOWN_SESSIONS = 2;
+
+export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string }> {
+  const [candidates, { data: recentSlotRows }] = await Promise.all([
+    getReviewCandidates(groupName),
+    supabase
+      .from("review_session_slots")
+      .select("topic_id, slot_number, subsection_names, session_id")
+      .order("id", { ascending: false })
+      .limit(SLOT1_COOLDOWN_SESSIONS * 4 + 4), // enough rows to cover recent sessions
+  ]);
+
   if (candidates.length === 0) return { slots: [], message: "No hay topics registrados para repasar." };
+
+  // Topics that occupied slot 1 in the last SLOT1_COOLDOWN_SESSIONS sessions → cooldown
+  const slot1Rows = (recentSlotRows ?? []).filter((r) => r.slot_number === 1);
+  const recentSessionIds = [...new Set(slot1Rows.map((r) => r.session_id))].slice(0, SLOT1_COOLDOWN_SESSIONS);
+  const cooledTopics = new Set(
+    slot1Rows.filter((r) => recentSessionIds.includes(r.session_id)).map((r) => r.topic_id),
+  );
+
+  // Last subsection targeted per topic (for rotation across bottom-3)
+  const lastSubByTopic = new Map<number, string>();
+  for (const r of (recentSlotRows ?? [])) {
+    if (!lastSubByTopic.has(r.topic_id) && r.subsection_names?.length > 0) {
+      lastSubByTopic.set(r.topic_id, r.subsection_names[0]);
+    }
+  }
 
   const used = new Set<number>();
 
+  // Picks from the bottom-3 weakest unmastered subsections, rotating away from the last one asked.
   function weakestQuickSubsection(c: ReviewCandidate): string {
     const pool = c.subsections.filter((s) => !s.mastered);
     const ranked = [...(pool.length > 0 ? pool : c.subsections)]
       .sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
-    return ranked[0]?.name ?? "general";
+    const bottom3 = ranked.slice(0, 3);
+    const lastSub = lastSubByTopic.get(c.topic_id);
+    const rotated = lastSub ? (bottom3.find((s) => s.name !== lastSub) ?? bottom3[0]) : bottom3[0];
+    return rotated?.name ?? "general";
   }
 
   function recentQuestionsFor(c: ReviewCandidate, subsectionName: string): string[] {
@@ -708,8 +739,9 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
 
   const slots: ReviewSlot[] = [];
 
-  // Slot 1: más urgente por tiempo
-  const s1 = candidates.find((c) => !used.has(c.topic_id));
+  // Slot 1: más urgente por tiempo — aplica cooldown para no repetir el mismo topic sesión tras sesión
+  const s1 = candidates.find((c) => !used.has(c.topic_id) && !cooledTopics.has(c.topic_id))
+    ?? candidates.find((c) => !used.has(c.topic_id)); // fallback si todos están en cooldown
   if (s1) {
     used.add(s1.topic_id);
     const s1Target = weakestQuickSubsection(s1);
@@ -800,7 +832,33 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     });
   }
 
-  return { slots };
+  // Persist the session for traceability and future cooldown calculations
+  let session_id: number | undefined;
+  try {
+    const { data: session, error: se } = await supabase
+      .from("review_sessions")
+      .insert({ group_name: groupName ?? null })
+      .select("id")
+      .single();
+    if (!se && session) {
+      session_id = session.id;
+      await supabase.from("review_session_slots").insert(
+        slots.map((slot) => ({
+          session_id: session.id,
+          slot_number: slot.slot,
+          topic_id: slot.topic_id,
+          format: slot.format,
+          subsection_names: slot.target_subsection
+            ? [slot.target_subsection]
+            : (slot.target_subsections ?? []),
+        })),
+      );
+    }
+  } catch {
+    // Session persistence is best-effort — don't fail the plan if it errors
+  }
+
+  return { slots, session_id };
 }
 
 export async function getStats(): Promise<Stats> {
