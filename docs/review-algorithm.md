@@ -102,6 +102,7 @@ days_overdue = hoy − next_review_date
 ### Slot 2 — fallo persistente
 
 - El primer topic no usado donde alguna subsección tiene `times_missed >= 2` y `avg_score < 4.0`.
+- `times_missed` es la cuenta de recalls con `covered = false` dentro de la ventana `RECENT_WINDOW` (últimos 5 recalls). Quick reviews no cuentan.
 - Si ninguno cumple, fallback al siguiente más urgente en el ranking.
 
 ### Slot 3 — consolidación
@@ -128,7 +129,7 @@ days_overdue = hoy − next_review_date
 ### Para slot 2 (`recall_dirigido`)
 
 Toma hasta 3 subsecciones ordenadas por:
-1. `times_missed` descendente (las más esquivadas primero).
+1. `times_missed` descendente — cuántos de los últimos 5 recalls tuvieron `covered = false` (las más esquivadas primero).
 2. `avg_score` ascendente como desempate.
 
 Excluye las que tienen `avg_score >= 4.0` (umbral suave).
