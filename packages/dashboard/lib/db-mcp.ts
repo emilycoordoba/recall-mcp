@@ -731,7 +731,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   function weakestRecallSubsections(c: ReviewCandidate): string[] {
     return [...c.subsections]
       .filter((s) => !s.mastered)
-      .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0 && s.times_missed === 0))
+      .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0))
       .sort((a, b) => b.times_missed - a.times_missed || (a.avg_score ?? 0) - (b.avg_score ?? 0))
       .slice(0, 3)
       .map((s) => s.name);
