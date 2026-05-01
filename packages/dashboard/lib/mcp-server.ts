@@ -148,6 +148,7 @@ export function createMcpServer(): McpServer {
       feedback:      z.string().optional().describe("Retroalimentación de la IA"),
       overall_score: z.number().min(0).max(5).describe("Puntuación global (0.0–5.0)"),
       format:        z.enum(["completo", "dirigido"]).optional().describe("Tipo de recall: 'completo' = recall libre de todo el topic (default, alimenta SM-2). 'dirigido' = solo subsecciones débiles, NO avanza el intervalo SM-2."),
+      session_id:    z.number().int().optional().describe("ID de la sesión de repaso devuelto por get_review_plan. Pasar siempre en sesiones de repaso para trazabilidad."),
       subsections: z.array(z.object({
         name:    z.string(),
         covered: z.boolean(),
@@ -187,6 +188,7 @@ export function createMcpServer(): McpServer {
       topic_name:    z.string().describe("Nombre exacto del topic"),
       overall_score: z.number().min(0).max(5).describe("Score global (0.0–5.0)"),
       feedback:      z.string().optional().describe("Resumen general de la sesión (opcional)"),
+      session_id:    z.number().int().optional().describe("ID de la sesión de repaso devuelto por get_review_plan. Pasar siempre en sesiones de repaso para trazabilidad."),
       answers: z.array(z.object({
         subsection_name: z.string(),
         question:        z.string(),

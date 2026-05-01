@@ -405,6 +405,80 @@ export async function getHistory(): Promise<HistoryEntry[]> {
   return [...recallEntries, ...qrEntries].sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export interface ReviewSessionSlot {
+  slot_number: number;
+  format: "quick" | "recall_dirigido" | "recall_completo";
+  topic_id: number;
+  topic_name: string;
+  subsection_names: string[];
+  score: number | null;
+  record_type: "recall" | "quick_review" | null;
+  record_id: number | null;
+}
+
+export interface ReviewSessionEntry {
+  id: number;
+  started_at: string;
+  group_name: string | null;
+  slots: ReviewSessionSlot[];
+}
+
+export async function getReviewSessions(): Promise<ReviewSessionEntry[]> {
+  const { data, error } = await supabase
+    .from("review_sessions")
+    .select(`
+      id, started_at, group_name,
+      review_session_slots(slot_number, format, subsection_names, topics(id, name)),
+      recalls(id, topic_id, overall_score, review_session_id),
+      quick_review_sessions(id, topic_id, overall_score, review_session_id)
+    `)
+    .order("started_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((session) => {
+    const recalls: { id: number; topic_id: number; overall_score: number | null }[] = session.recalls ?? [];
+    const qrs: { id: number; topic_id: number; overall_score: number | null }[] = session.quick_review_sessions ?? [];
+
+    const recallByTopic = new Map(recalls.map((r) => [r.topic_id, r]));
+    const qrByTopic = new Map(qrs.map((q) => [q.topic_id, q]));
+
+    const slots: ReviewSessionSlot[] = ((session.review_session_slots ?? []) as any[])
+      .sort((a: any, b: any) => a.slot_number - b.slot_number)
+      .map((slot: any) => {
+        const topicId = (slot.topics as { id: number; name: string } | null)?.id ?? 0;
+        const topicName = (slot.topics as { id: number; name: string } | null)?.name ?? "?";
+        const format = slot.format as ReviewSessionSlot["format"];
+
+        const recall = recallByTopic.get(topicId);
+        const qr = qrByTopic.get(topicId);
+
+        // recall_completo and recall_dirigido link to recalls; quick links to quick_review_sessions
+        const linked = format === "quick" ? qr : recall;
+        const recordType = format === "quick" ? (qr ? "quick_review" : null) : (recall ? "recall" : null);
+
+        return {
+          slot_number: slot.slot_number,
+          format,
+          topic_id: topicId,
+          topic_name: topicName,
+          subsection_names: slot.subsection_names ?? [],
+          score: linked?.overall_score ?? null,
+          record_type: recordType,
+          record_id: linked?.id ?? null,
+        };
+      });
+
+    return {
+      id: session.id,
+      started_at: session.started_at,
+      group_name: session.group_name,
+      slots,
+    };
+  });
+}
+
 export async function getQuickReviewAnswers(sessionId: number): Promise<QuickReviewAnswerRow[]> {
   const { data, error } = await supabase
     .from("quick_review_answers")

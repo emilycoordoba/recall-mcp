@@ -179,10 +179,10 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    - Evaluate against the full table of contents (all subsections). Give structured feedback (✅⚠️❌🔴 format, same as a normal recall) + score per subsection + overall score.
    - This slot feeds SM-2 — treat it exactly like a normal recall but without the preliminary questions ("any questions?").
 
-3. After all slots, save:
-   - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)
-   - Recall dirigido slot → `save_recall` with `format: "dirigido"` (targeted subsections only — do NOT call `save_topic_subsections` first)
-   - Recall completo slot → `save_recall` with `format: "completo"` (all subsections, full feedback — do NOT call `save_topic_subsections` first)
+3. After all slots, save — always pass the `session_id` returned by `get_review_plan` to link records for traceability:
+   - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer, session_id)
+   - Recall dirigido slot → `save_recall` with `format: "dirigido"`, `session_id` (targeted subsections only — do NOT call `save_topic_subsections` first)
+   - Recall completo slot → `save_recall` with `format: "completo"`, `session_id` (all subsections, full feedback — do NOT call `save_topic_subsections` first)
 
 4. Give a **brief session summary** (2–4 lines total, after saving):
    - One line per topic: score + what was strong + what still needs work.

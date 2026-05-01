@@ -45,6 +45,9 @@ export default async function DashboardPage() {
               🔥 {streak} {streak === 1 ? "día" : "días"}
             </span>
           )}
+          <Link href="/sessions" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+            Sesiones →
+          </Link>
           <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Historial →
           </Link>

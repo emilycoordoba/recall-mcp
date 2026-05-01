@@ -48,12 +48,13 @@ review_sessions
 **`recalls`** — cada sesión de recall libre.
 - `topic_id`, `recalled_at`, `transcript`, `feedback`, `overall_score`
 - `format`: `"completo"` (avanza SM-2) o `"dirigido"` (no avanza SM-2)
+- `review_session_id` (FK → `review_sessions`, null si fue recall espontáneo fuera de sesión)
 
 **`recall_subsections`** — resultado por subsección dentro de un recall.
 - `recall_id`, `subsection_id`, `covered` (bool), `score`
 
 **`quick_review_sessions`** — sesiones de quick review (preguntas curadas).
-- `topic_id`, `reviewed_at`, `overall_score`, `feedback`
+- `topic_id`, `reviewed_at`, `overall_score`, `feedback`, `review_session_id` (FK → `review_sessions`)
 
 **`quick_review_answers`** — cada pregunta/respuesta dentro de un QR.
 - `session_id`, `subsection_id`, `question`, `answer`, `score`, `feedback`
@@ -95,10 +96,10 @@ Se activa cuando el usuario dice "quiero repasar" o similar.
    → recibe 4 slots calculados + session_id
    → la sesión queda registrada en review_sessions / review_session_slots
 2. Claude ejecuta los slots en orden (ver review-algorithm.md)
-3. Al terminar, Claude guarda resultados:
-   - Slots quick      → save_quick_review()
-   - Slot dirigido    → save_recall() con format: "dirigido"
-   - Slot completo    → save_recall() con format: "completo"
+3. Al terminar, Claude guarda resultados — siempre con el `session_id` devuelto por `get_review_plan`:
+   - Slots quick      → save_quick_review() con session_id
+   - Slot dirigido    → save_recall() con format: "dirigido" + session_id
+   - Slot completo    → save_recall() con format: "completo" + session_id
 4. Claude da resumen de la sesión (2-4 líneas)
 ```
 
@@ -170,6 +171,7 @@ Rutas disponibles:
 |---|---|
 | `/` | Lista de todos los topics con score, fecha, tendencia y días hasta próxima revisión |
 | `/topics/[id]` | Detalle: subsecciones, historial de recalls con breakdown por subsección |
+| `/sessions` | Sesiones de repaso agrupadas por día, con los 4 slots y scores por slot |
 | `/history` | Historial cronológico de todas las sesiones (recalls y quick reviews) |
 
 El dashboard solo lee de Supabase — nunca escribe.

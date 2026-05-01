@@ -15,6 +15,7 @@ export interface SaveRecallInput {
   feedback?: string;
   overall_score: number;
   format?: "completo" | "dirigido";
+  session_id?: number;
   subsections: SubsectionInput[];
 }
 
@@ -36,6 +37,7 @@ export interface SaveQuickReviewInput {
   topic_name: string;
   overall_score: number;
   feedback?: string;
+  session_id?: number;
   answers: QuickReviewAnswerInput[];
 }
 
@@ -469,6 +471,7 @@ export async function saveRecall(input: SaveRecallInput) {
       feedback: input.feedback ?? null,
       overall_score: input.overall_score,
       format: input.format ?? "completo",
+      review_session_id: input.session_id ?? null,
     })
     .select("id")
     .single();
@@ -504,7 +507,7 @@ export async function saveQuickReview(input: SaveQuickReviewInput) {
 
   const { data: session, error: se } = await supabase
     .from("quick_review_sessions")
-    .insert({ topic_id: topic.id, overall_score: input.overall_score, feedback: input.feedback ?? null })
+    .insert({ topic_id: topic.id, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null })
     .select("id")
     .single();
   if (se) throw se;
