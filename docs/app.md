@@ -176,6 +176,20 @@ Rutas disponibles:
 
 El dashboard solo lee de Supabase — nunca escribe.
 
+### Columna "Próxima"
+
+Muestra cuándo toca el próximo `recall_completo` según SM-2.
+
+| Indicador | Color | Significado |
+|---|---|---|
+| `—` | gris | Nunca se ha hecho un `recall_completo` — SM-2 no ha arrancado |
+| `en Nd` | gris | Faltan N días para la próxima revisión — no toca aún |
+| `hoy` | amarillo | La fecha de revisión es hoy |
+| `+Nd` | **rojo** | Atrasado N días y tiene ≥ 2 recalls completos (intervalo SM-2 fiable) |
+| `+Nd` | gris tenue | Atrasado según SM-2 pero solo tiene 1 recall completo — el primer intervalo es siempre 3 días, no es significativo todavía |
+
+El umbral para considerar el intervalo SM-2 "fiable" es `total_recalls >= 2`. Con un solo recall el intervalo es fijo en 3 días para todos los topics, lo que genera demasiado ruido visual.
+
 ---
 
 ## Configuración
