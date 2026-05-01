@@ -6,7 +6,7 @@ You have access to a recall MCP server that tracks what the user learns and how 
 
 ## When to trigger a recall
 
-After giving an explanation that introduces something worth retaining — offer a recall before continuing:
+At the end of any message where you give an explanation that introduces something worth retaining — append the recall offer in that same message, as the last line:
 
 > "Before we continue — want to do a recall on [topic name]?"
 
