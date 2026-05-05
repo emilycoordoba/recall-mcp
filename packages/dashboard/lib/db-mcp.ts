@@ -569,6 +569,30 @@ export async function updateRecallFeedback(recallId: number, feedback: string) {
   return { success: true, updated_recall_id: recallId };
 }
 
+export async function updateTopicById(
+  id: number,
+  updates: { name?: string },
+) {
+  const patch: Record<string, unknown> = {};
+
+  if (updates.name !== undefined) {
+    const { data: existing } = await supabase
+      .from("topics")
+      .select("id")
+      .ilike("name", updates.name)
+      .neq("id", id)
+      .maybeSingle();
+    if (existing) return { success: false, error: `Ya existe un topic llamado "${updates.name}"` };
+    patch.name = updates.name;
+  }
+
+  if (Object.keys(patch).length === 0) return { success: true, topic_id: id };
+
+  const { error } = await supabase.from("topics").update(patch).eq("id", id);
+  if (error) return { success: false, error: error.message };
+  return { success: true, topic_id: id };
+}
+
 export async function updateTopic(
   topicName: string,
   updates: { new_name?: string; group_name?: string | null },

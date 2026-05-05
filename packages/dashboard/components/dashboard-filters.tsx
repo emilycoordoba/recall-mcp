@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -76,12 +77,71 @@ function TrendIndicator({ trend }: { trend: "up" | "down" | "flat" | null }) {
   return <span className="text-xs text-muted-foreground">→</span>
 }
 
+function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: number, newName: string) => Promise<void> }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(topic.name)
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit(e: React.MouseEvent) {
+    e.preventDefault()
+    setValue(topic.name)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  async function commit() {
+    const trimmed = value.trim()
+    if (!trimmed || trimmed === topic.name) { setEditing(false); return }
+    setSaving(true)
+    await onRename(topic.id, trimmed)
+    setSaving(false)
+    setEditing(false)
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") commit()
+    if (e.key === "Escape") { setValue(topic.name); setEditing(false) }
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={value}
+        disabled={saving}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        className="w-full rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+      />
+    )
+  }
+
+  return (
+    <span className="group inline-flex items-center gap-1.5">
+      <Link href={`/topics/${topic.id}`} className="font-medium underline-offset-4 hover:underline">
+        {topic.name}
+      </Link>
+      <button
+        onClick={startEdit}
+        title="Editar nombre"
+        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground transition-opacity text-xs leading-none"
+      >
+        ✎
+      </button>
+    </span>
+  )
+}
+
 interface Props {
   topics: TopicRow[]
   groups: string[]
 }
 
 export function DashboardFilters({ topics, groups }: Props) {
+  const router = useRouter()
+  const [localTopics, setLocalTopics] = useState(topics)
   const [search, setSearch] = useState("")
   const [group, setGroup] = useState("all")
   const [sort, setSort] = useState<SortKey>(() => {
@@ -89,7 +149,24 @@ export function DashboardFilters({ topics, groups }: Props) {
     return (localStorage.getItem("dashboard-sort") as SortKey) ?? "name"
   })
 
-  const filtered = topics
+  async function handleRename(id: number, newName: string) {
+    const prev = localTopics
+    setLocalTopics((ts) => ts.map((t) => t.id === id ? { ...t, name: newName } : t))
+    const res = await fetch(`/api/topics/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) {
+      setLocalTopics(prev)
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "Error al renombrar")
+    } else {
+      router.refresh()
+    }
+  }
+
+  const filtered = localTopics
     .filter((t) => group === "all" || t.group_name === group)
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -178,9 +255,7 @@ export function DashboardFilters({ topics, groups }: Props) {
               filtered.map((topic) => (
                   <TableRow key={topic.id}>
                     <TableCell>
-                      <Link href={`/topics/${topic.id}`} className="font-medium underline-offset-4 hover:underline">
-                        {topic.name}
-                      </Link>
+                      <TopicNameCell topic={topic} onRename={handleRename} />
                     </TableCell>
                     <TableCell>
                       {topic.group_name
