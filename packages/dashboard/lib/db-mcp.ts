@@ -68,36 +68,57 @@ export interface ReviewCandidate {
   subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
 }
 
+// ─── User resolution ──────────────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  name: string;
+}
+
+// Resolves the user owning a given MCP bearer token. Returns null when the token
+// is unknown — callers must treat that as 401.
+export async function getUserByToken(token: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name")
+    .eq("mcp_token", token)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getOrCreateGroup(name: string): Promise<number> {
+async function getOrCreateGroup(name: string, userId: number): Promise<number> {
   const { data: existing } = await supabase
     .from("topic_groups")
     .select("id")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (existing) return existing.id;
 
   const { data, error } = await supabase
     .from("topic_groups")
-    .insert({ name })
+    .insert({ name, user_id: userId })
     .select("id")
     .single();
   if (error) throw error;
   return data.id;
 }
 
-async function getOrCreateTopic(name: string, groupId: number | null): Promise<number> {
+async function getOrCreateTopic(name: string, groupId: number | null, userId: number): Promise<number> {
   const { data: existing } = await supabase
     .from("topics")
     .select("id")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (existing) return existing.id;
 
   const { data, error } = await supabase
     .from("topics")
-    .insert({ name, group_id: groupId })
+    .insert({ name, group_id: groupId, user_id: userId })
     .select("id")
     .single();
   if (error) throw error;
@@ -106,16 +127,18 @@ async function getOrCreateTopic(name: string, groupId: number | null): Promise<n
 
 // ─── Read operations ──────────────────────────────────────────────────────────
 
-export async function findTopics(query: string) {
+export async function findTopics(query: string, userId: number) {
   const [{ data: topicData, error: te }, { data: subsData, error: se }] = await Promise.all([
     supabase
       .from("topics")
       .select("id, name, group_id, topic_groups(name)")
+      .eq("user_id", userId)
       .ilike("name", `%${query}%`)
       .order("name"),
     supabase
       .from("topic_subsections")
       .select("name, topic_id, topics(id, name, group_id, topic_groups(name))")
+      .eq("user_id", userId)
       .ilike("name", `%${query}%`),
   ]);
   if (te) throw te;
@@ -158,10 +181,11 @@ export async function findTopics(query: string) {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function getTopicByName(name: string) {
+export async function getTopicByName(name: string, userId: number) {
   const { data, error } = await supabase
     .from("topics")
     .select("id, name, group_id, topic_groups(name)")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (error) throw error;
@@ -173,11 +197,12 @@ export async function getTopicByName(name: string) {
   };
 }
 
-export async function getTopicHistory(topicId: number) {
+export async function getTopicHistory(topicId: number, userId: number) {
   const { data: topic, error: te } = await supabase
     .from("topics")
     .select("id, name")
     .eq("id", topicId)
+    .eq("user_id", userId)
     .maybeSingle();
   if (te) throw te;
   if (!topic) return null;
@@ -214,16 +239,18 @@ export async function getTopicHistory(topicId: number) {
   return { ...topic, subsections: subsections ?? [], recalls: recallsWithSubs };
 }
 
-export async function listTopics(groupName?: string) {
+export async function listTopics(userId: number, groupName?: string) {
   let query = supabase
     .from("topics")
     .select(`id, name, created_at, group_id, topic_groups(name), recalls(overall_score, recalled_at)`)
+    .eq("user_id", userId)
     .order("name");
 
   if (groupName) {
     const { data: group } = await supabase
       .from("topic_groups")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", groupName)
       .maybeSingle();
     if (group) query = query.eq("group_id", group.id);
@@ -248,10 +275,11 @@ export async function listTopics(groupName?: string) {
 }
 
 export async function filterTopics(
+  userId: number,
   sortBy: "score_asc" | "score_desc" | "date_asc" | "date_desc" | "name",
   groupName?: string,
 ) {
-  const rows = await listTopics(groupName);
+  const rows = await listTopics(userId, groupName);
 
   return rows.sort((a, b) => {
     switch (sortBy) {
@@ -268,7 +296,7 @@ export async function filterTopics(
 // Keeps metrics reflecting current knowledge rather than accumulating indefinitely.
 const RECENT_WINDOW = 5;
 
-export async function getReviewCandidates(groupName?: string): Promise<ReviewCandidate[]> {
+export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase
     .from("topics")
     .select(`
@@ -282,12 +310,14 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         quick_review_answers(session_id, score, question)
       )
     `)
+    .eq("user_id", userId)
     .order("name");
 
   if (groupName) {
     const { data: group } = await supabase
       .from("topic_groups")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", groupName)
       .maybeSingle();
     if (group) query = query.eq("group_id", group.id);
@@ -417,15 +447,15 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
 // ─── Write operations ─────────────────────────────────────────────────────────
 
-export async function saveTopicSubsections(input: SaveTopicSubsectionsInput) {
-  const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
-  const topicId = await getOrCreateTopic(input.topic_name, groupId);
+export async function saveTopicSubsections(input: SaveTopicSubsectionsInput, userId: number) {
+  const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
+  const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
 
   // Upsert with correct order (updates order_index on existing subsections too)
   await supabase
     .from("topic_subsections")
     .upsert(
-      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i })),
+      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i, user_id: userId })),
       { onConflict: "topic_id,name", ignoreDuplicates: false },
     );
 
@@ -459,14 +489,15 @@ export async function saveTopicSubsections(input: SaveTopicSubsectionsInput) {
   return { topic_id: topicId, subsections: subsections ?? [] };
 }
 
-export async function saveRecall(input: SaveRecallInput) {
-  const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
-  const topicId = await getOrCreateTopic(input.topic_name, groupId);
+export async function saveRecall(input: SaveRecallInput, userId: number) {
+  const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
+  const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
 
   const { data: recall, error: re } = await supabase
     .from("recalls")
     .insert({
       topic_id: topicId,
+      user_id: userId,
       transcript: input.transcript ?? null,
       feedback: input.feedback ?? null,
       overall_score: input.overall_score,
@@ -501,13 +532,13 @@ export async function saveRecall(input: SaveRecallInput) {
   return { recall_id: recallId, topic_id: topicId };
 }
 
-export async function saveQuickReview(input: SaveQuickReviewInput) {
-  const topic = await getTopicByName(input.topic_name);
+export async function saveQuickReview(input: SaveQuickReviewInput, userId: number) {
+  const topic = await getTopicByName(input.topic_name, userId);
   if (!topic) return { success: false as const, error: `Topic "${input.topic_name}" no encontrado` };
 
   const { data: session, error: se } = await supabase
     .from("quick_review_sessions")
-    .insert({ topic_id: topic.id, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null })
+    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null })
     .select("id")
     .single();
   if (se) throw se;
@@ -534,8 +565,8 @@ export async function saveQuickReview(input: SaveQuickReviewInput) {
   return { success: true as const, session_id: session.id, topic_id: topic.id };
 }
 
-export async function updateSubsectionName(topicName: string, oldName: string, newName: string) {
-  const topic = await getTopicByName(topicName);
+export async function updateSubsectionName(topicName: string, oldName: string, newName: string, userId: number) {
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const { data: sub } = await supabase
@@ -556,11 +587,12 @@ export async function updateSubsectionName(topicName: string, oldName: string, n
   return { success: true, updated: { topic: topicName, old_name: oldName, new_name: newName } };
 }
 
-export async function updateRecallFeedback(recallId: number, feedback: string) {
+export async function updateRecallFeedback(recallId: number, feedback: string, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
     .update({ feedback })
     .eq("id", recallId)
+    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -572,6 +604,7 @@ export async function updateRecallFeedback(recallId: number, feedback: string) {
 export async function updateTopicById(
   id: number,
   updates: { name?: string },
+  userId: number,
 ) {
   const patch: Record<string, unknown> = {};
 
@@ -579,6 +612,7 @@ export async function updateTopicById(
     const { data: existing } = await supabase
       .from("topics")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", updates.name)
       .neq("id", id)
       .maybeSingle();
@@ -588,7 +622,7 @@ export async function updateTopicById(
 
   if (Object.keys(patch).length === 0) return { success: true, topic_id: id };
 
-  const { error } = await supabase.from("topics").update(patch).eq("id", id);
+  const { error } = await supabase.from("topics").update(patch).eq("id", id).eq("user_id", userId);
   if (error) return { success: false, error: error.message };
   return { success: true, topic_id: id };
 }
@@ -596,8 +630,9 @@ export async function updateTopicById(
 export async function updateTopic(
   topicName: string,
   updates: { new_name?: string; group_name?: string | null },
+  userId: number,
 ) {
-  const topic = await getTopicByName(topicName);
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const patch: Record<string, unknown> = {};
@@ -606,6 +641,7 @@ export async function updateTopic(
     const { data: existing } = await supabase
       .from("topics")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", updates.new_name)
       .neq("id", topic.id)
       .maybeSingle();
@@ -615,20 +651,21 @@ export async function updateTopic(
 
   if (updates.group_name !== undefined) {
     patch.group_id = updates.group_name !== null
-      ? await getOrCreateGroup(updates.group_name)
+      ? await getOrCreateGroup(updates.group_name, userId)
       : null;
   }
 
-  const { error } = await supabase.from("topics").update(patch).eq("id", topic.id);
+  const { error } = await supabase.from("topics").update(patch).eq("id", topic.id).eq("user_id", userId);
   if (error) return { success: false, error: error.message };
   return { success: true, topic_id: topic.id };
 }
 
-export async function deleteRecall(recallId: number) {
+export async function deleteRecall(recallId: number, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
     .delete()
     .eq("id", recallId)
+    .eq("user_id", userId)
     .select("id, topic_id")
     .maybeSingle();
 
@@ -637,9 +674,9 @@ export async function deleteRecall(recallId: number) {
   return { success: true, deleted_recall_id: recallId, topic_id: data.topic_id };
 }
 
-export async function mergeTopics(sourceName: string, targetName: string) {
-  const source = await getTopicByName(sourceName);
-  const target = await getTopicByName(targetName);
+export async function mergeTopics(sourceName: string, targetName: string, userId: number) {
+  const source = await getTopicByName(sourceName, userId);
+  const target = await getTopicByName(targetName, userId);
 
   if (!source) return { success: false, error: `Topic origen "${sourceName}" no encontrado` };
   if (!target) return { success: false, error: `Topic destino "${targetName}" no encontrado` };
@@ -668,17 +705,18 @@ export async function mergeTopics(sourceName: string, targetName: string) {
         topic_id: target.id,
         name: s.name,
         order_index: (targetCount ?? 0) + i,
+        user_id: userId,
       })),
       { onConflict: "topic_id,name", ignoreDuplicates: true },
     );
 
-  await supabase.from("topics").delete().eq("id", source.id);
+  await supabase.from("topics").delete().eq("id", source.id).eq("user_id", userId);
 
   return { success: true, merged_into: targetName, subsections_moved: (sourceSubs ?? []).length };
 }
 
-export async function deleteTopic(topicName: string) {
-  const topic = await getTopicByName(topicName);
+export async function deleteTopic(topicName: string, userId: number) {
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const { count } = await supabase
@@ -686,7 +724,7 @@ export async function deleteTopic(topicName: string) {
     .select("id", { count: "exact", head: true })
     .eq("topic_id", topic.id);
 
-  await supabase.from("topics").delete().eq("id", topic.id);
+  await supabase.from("topics").delete().eq("id", topic.id).eq("user_id", userId);
 
   return { success: true, deleted_topic: topicName, recalls_deleted: count ?? 0 };
 }
@@ -711,12 +749,13 @@ export interface ReviewSlot {
 // 2 means: if a topic was slot 1 in either of the last 2 sessions, skip it.
 const SLOT1_COOLDOWN_SESSIONS = 2;
 
-export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string }> {
+export async function getReviewPlan(userId: number, groupName?: string): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string }> {
   const [candidates, { data: recentSlotRows }] = await Promise.all([
-    getReviewCandidates(groupName),
+    getReviewCandidates(userId, groupName),
     supabase
       .from("review_session_slots")
       .select("topic_id, slot_number, subsection_names, session_id")
+      .eq("user_id", userId)
       .order("id", { ascending: false })
       .limit(SLOT1_COOLDOWN_SESSIONS * 4 + 4), // enough rows to cover recent sessions
   ]);
@@ -864,7 +903,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   try {
     const { data: session, error: se } = await supabase
       .from("review_sessions")
-      .insert({ group_name: groupName ?? null })
+      .insert({ group_name: groupName ?? null, user_id: userId })
       .select("id")
       .single();
     if (!se && session) {
@@ -872,6 +911,7 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
       await supabase.from("review_session_slots").insert(
         slots.map((slot) => ({
           session_id: session.id,
+          user_id: userId,
           slot_number: slot.slot,
           topic_id: slot.topic_id,
           format: slot.format,
@@ -888,15 +928,15 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   return { slots, session_id };
 }
 
-export async function getStats(): Promise<Stats> {
+export async function getStats(userId: number): Promise<Stats> {
   const [
     { data: topics },
     { data: recalls },
     { data: qrs },
   ] = await Promise.all([
-    supabase.from("topics").select("id, topic_groups(name)"),
-    supabase.from("recalls").select("topic_id, recalled_at, overall_score"),
-    supabase.from("quick_review_sessions").select("topic_id, reviewed_at"),
+    supabase.from("topics").select("id, topic_groups(name)").eq("user_id", userId),
+    supabase.from("recalls").select("topic_id, recalled_at, overall_score").eq("user_id", userId),
+    supabase.from("quick_review_sessions").select("topic_id, reviewed_at").eq("user_id", userId),
   ]);
 
   const totalTopics = topics?.length ?? 0;

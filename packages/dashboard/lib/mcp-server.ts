@@ -20,7 +20,7 @@ import {
   deleteTopic,
 } from "./db-mcp";
 
-export function createMcpServer(): McpServer {
+export function createMcpServer(userId: number): McpServer {
   const server = new McpServer({ name: "recall-mcp", version: "2.0.0" });
 
   // ─── find_topic ─────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ export function createMcpServer(): McpServer {
     "Busca topics existentes por nombre o por nombre de subsección (búsqueda parcial). Devuelve match_type: 'topic' | 'subsection' | 'both' y matched_subsections cuando el match es por subsección. Usar ANTES de save_recall para detectar duplicados.",
     { query: z.string().describe("Texto a buscar en el nombre del topic o de sus subsecciones") },
     async ({ query }) => {
-      const results = await findTopics(query);
+      const results = await findTopics(query, userId);
       return { content: [{ type: "text", text: JSON.stringify({ found: results.length, topics: results }, null, 2) }] };
     },
   );
@@ -42,11 +42,11 @@ export function createMcpServer(): McpServer {
     "Devuelve el historial completo de un topic: subsecciones canónicas y todos sus recalls.",
     { topic_name: z.string().describe("Nombre exacto del topic") },
     async ({ topic_name }) => {
-      const topic = await getTopicByName(topic_name);
+      const topic = await getTopicByName(topic_name, userId);
       if (!topic) {
         return { content: [{ type: "text", text: JSON.stringify({ found: false, message: `No se encontró "${topic_name}"` }, null, 2) }] };
       }
-      const history = await getTopicHistory(topic.id);
+      const history = await getTopicHistory(topic.id, userId);
       return { content: [{ type: "text", text: JSON.stringify({ found: true, topic: history }, null, 2) }] };
     },
   );
@@ -58,7 +58,7 @@ export function createMcpServer(): McpServer {
     "Lista todos los topics con su última puntuación, fecha de recall y total de recalls.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, devuelve todos.") },
     async ({ group_name }) => {
-      const topics = await listTopics(group_name);
+      const topics = await listTopics(userId, group_name);
       return { content: [{ type: "text", text: JSON.stringify({ total: topics.length, topics }, null, 2) }] };
     },
   );
@@ -75,7 +75,7 @@ export function createMcpServer(): McpServer {
       group_name: z.string().optional().describe("Filtrar por grupo."),
     },
     async ({ sort_by, group_name }) => {
-      const topics = await filterTopics(sort_by, group_name);
+      const topics = await filterTopics(userId, sort_by, group_name);
       return { content: [{ type: "text", text: JSON.stringify({ total: topics.length, sort_by, topics }, null, 2) }] };
     },
   );
@@ -87,7 +87,7 @@ export function createMcpServer(): McpServer {
     "Devuelve todos los topics ordenados por urgencia (urgencia = días_sin_repasar / (avg_score + 1)). Usar para exploración. Para sesiones de repaso usar get_review_plan.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
-      const candidates = await getReviewCandidates(group_name);
+      const candidates = await getReviewCandidates(userId, group_name);
       return { content: [{ type: "text", text: JSON.stringify({ total: candidates.length, candidates }, null, 2) }] };
     },
   );
@@ -99,7 +99,7 @@ export function createMcpServer(): McpServer {
     "Genera el plan de la sesión de repaso: 3 slots con topic, formato (quick / recall_dirigido) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
-      const plan = await getReviewPlan(group_name);
+      const plan = await getReviewPlan(userId, group_name);
       return { content: [{ type: "text", text: JSON.stringify(plan, null, 2) }] };
     },
   );
@@ -111,7 +111,7 @@ export function createMcpServer(): McpServer {
     "Devuelve un resumen global del progreso: total de topics, recalls, promedio de score, topics bajo 3.0, topics nunca repasados, racha de días y grupo más activo.",
     {},
     async () => {
-      const stats = await getStats();
+      const stats = await getStats(userId);
       return { content: [{ type: "text", text: JSON.stringify(stats, null, 2) }] };
     },
   );
@@ -128,7 +128,7 @@ export function createMcpServer(): McpServer {
     },
     async (input) => {
       try {
-        const result = await saveTopicSubsections(input);
+        const result = await saveTopicSubsections(input, userId);
         return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Topic "${input.topic_name}" listo para recall`, ...result }, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: JSON.stringify({ success: false, error: String(err) }) }], isError: true };
@@ -157,9 +157,9 @@ export function createMcpServer(): McpServer {
     },
     async (input) => {
       try {
-        const result = await saveRecall(input);
-        const topic = await getTopicByName(input.topic_name);
-        const history = topic ? await getTopicHistory(topic.id) : null;
+        const result = await saveRecall(input, userId);
+        const topic = await getTopicByName(input.topic_name, userId);
+        const history = topic ? await getTopicHistory(topic.id, userId) : null;
         return {
           content: [{
             type: "text",
@@ -198,7 +198,7 @@ export function createMcpServer(): McpServer {
       })).describe("Preguntas, respuestas, scores y feedback por respuesta"),
     },
     async (input) => {
-      const result = await saveQuickReview(input);
+      const result = await saveQuickReview(input, userId);
       if (!result.success) {
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: true };
       }
@@ -228,7 +228,7 @@ export function createMcpServer(): McpServer {
       new_name:   z.string(),
     },
     async ({ topic_name, old_name, new_name }) => {
-      const result = await updateSubsectionName(topic_name, old_name, new_name);
+      const result = await updateSubsectionName(topic_name, old_name, new_name, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );
@@ -243,7 +243,7 @@ export function createMcpServer(): McpServer {
       feedback:  z.string().describe("Texto completo del feedback"),
     },
     async ({ recall_id, feedback }) => {
-      const result = await updateRecallFeedback(recall_id, feedback);
+      const result = await updateRecallFeedback(recall_id, feedback, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );
@@ -259,7 +259,7 @@ export function createMcpServer(): McpServer {
       group_name: z.string().nullable().optional().describe("Nuevo grupo. null para quitar el grupo."),
     },
     async ({ topic_name, new_name, group_name }) => {
-      const result = await updateTopic(topic_name, { new_name, group_name });
+      const result = await updateTopic(topic_name, { new_name, group_name }, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );
@@ -271,7 +271,7 @@ export function createMcpServer(): McpServer {
     "Borra una sesión de recall específica por ID.",
     { recall_id: z.number().int() },
     async ({ recall_id }) => {
-      const result = await deleteRecall(recall_id);
+      const result = await deleteRecall(recall_id, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );
@@ -286,7 +286,7 @@ export function createMcpServer(): McpServer {
       target_topic: z.string().describe("Topic que absorbe al origen"),
     },
     async ({ source_topic, target_topic }) => {
-      const result = await mergeTopics(source_topic, target_topic);
+      const result = await mergeTopics(source_topic, target_topic, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );
@@ -298,7 +298,7 @@ export function createMcpServer(): McpServer {
     "Borra un topic y TODO su historial. Acción irreversible.",
     { topic_name: z.string() },
     async ({ topic_name }) => {
-      const result = await deleteTopic(topic_name);
+      const result = await deleteTopic(topic_name, userId);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }], isError: !result.success };
     },
   );

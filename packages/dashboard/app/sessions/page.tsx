@@ -1,8 +1,7 @@
 import Link from "next/link"
 import { getReviewSessions } from "@/lib/db"
+import { currentUserId } from "@/lib/auth"
 import { SessionCard } from "@/components/session-card"
-
-export const revalidate = 30
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("es-ES", {
@@ -14,7 +13,7 @@ function formatDay(iso: string) {
 }
 
 export default async function SessionsPage() {
-  const sessions = await getReviewSessions()
+  const sessions = await getReviewSessions(await currentUserId())
 
   const byDay = new Map<string, typeof sessions>()
   for (const s of sessions) {

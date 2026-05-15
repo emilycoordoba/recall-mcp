@@ -1,8 +1,7 @@
 import Link from "next/link"
 import { getHistory } from "@/lib/db"
+import { currentUserId } from "@/lib/auth"
 import { HistoryEntryRow } from "@/components/history-entry"
-
-export const revalidate = 30
 
 function formatDay(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString("es-ES", {
@@ -14,7 +13,7 @@ function formatDay(iso: string) {
 }
 
 export default async function HistoryPage() {
-  const entries = await getHistory()
+  const entries = await getHistory(await currentUserId())
 
   const byDay = new Map<string, typeof entries>()
   for (const entry of entries) {
