@@ -59,6 +59,9 @@ qué subtema quiere reforzar y trátalo igual.
    cuando para no perderlo. Objetivo: que **todos** los tipos de caso lleguen a
    dominados (ella va a enseñar esto, no le basta con los fáciles). Si el subtema
    es atómico (`general`), varía dificultad y forma del enunciado.
+   - **Usa los nombres EXACTOS de subsección que devuelve `get_topic`.** No
+     inventes ni acortes etiquetas: al guardar, `subsection_name` debe coincidir
+     literalmente con uno de esos nombres, o se pierde la métrica por caso.
 
 3. **Set adaptativo de ejercicios** (no número fijo):
    - Plantea de a un ejercicio. Pide que escriba el procedimiento paso a paso.
@@ -83,8 +86,11 @@ qué subtema quiere reforzar y trátalo igual.
 
 ## Progresión de dificultad
 
-- Dos sesiones seguidas con score ≥4 en un subtema → sube `current_difficulty` y
-  díselo ("vamos a subir un poco la dificultad de fracciones").
+La dificultad NO se guarda en un campo: vive en la línea `Dificultad: N/5` del
+feedback de la sesión (ver Guardado). La reconstruyes leyendo `get_topic`.
+
+- Dos sesiones seguidas con score ≥4 en un subtema → sube la dificultad un nivel
+  y díselo ("vamos a subir un poco la dificultad de fracciones").
 - Score <3 → baja la dificultad la próxima vez y vuelve a lo básico de ese subtema.
 - Un subtema con score ≥4.5 sostenido **no** se abandona: el motor lo reagenda más
   espaciado solo. Cuando vuelva, ejercicios de dificultad alta para mantener.
