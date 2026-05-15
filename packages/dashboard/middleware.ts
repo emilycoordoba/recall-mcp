@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserByDashboardCreds, USER_HEADER } from "@/lib/auth";
+import { getUserByDashboardCreds, USER_HEADER } from "@/lib/auth-shared";
 
 const REALM = "Recall Dashboard";
 
