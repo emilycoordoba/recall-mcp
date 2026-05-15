@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "crypto";
+import { getUserByDashboardCreds } from "@/lib/auth-shared";
 
 function b64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
@@ -17,6 +18,7 @@ function generateCode(payload: object): string {
 export async function POST(request: Request) {
   const body = new URLSearchParams(await request.text());
 
+  const username = body.get("username") ?? "";
   const password = body.get("password") ?? "";
   const redirectUri = body.get("redirect_uri") ?? "";
   const codeChallenge = body.get("code_challenge") ?? "";
@@ -36,7 +38,8 @@ export async function POST(request: Request) {
     ...(state ? { state } : {}),
   });
 
-  if (!process.env.DASHBOARD_PASS || password !== process.env.DASHBOARD_PASS) {
+  const user = await getUserByDashboardCreds(username, password);
+  if (!user) {
     return Response.redirect(
       new URL(`/authorize?${authorizeParams}`, request.url),
       302,
@@ -47,11 +50,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_request" }, { status: 400 });
   }
 
+  // Embed the resolved user so the token endpoint can hand back *their* token.
   const code = generateCode({
     cc: codeChallenge,
     ccm: codeChallengeMethod,
     ru: redirectUri,
     ci: clientId,
+    uid: user.id,
     exp: Date.now() + 5 * 60 * 1000,
   });
 

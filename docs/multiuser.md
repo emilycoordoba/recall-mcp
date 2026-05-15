@@ -22,6 +22,13 @@ usuarios reales, identificados por token.
 - **MCP** (`pages/api/mcp.ts`): el Bearer token se resuelve contra
   `users.mcp_token` → `user.id`, que se pasa a `createMcpServer(userId)` y de ahí
   a cada tool y a cada función de `db-mcp.ts`.
+- **OAuth** (`/api/oauth/*`, lo usa Claude Desktop): la página `/authorize` pide
+  **usuario + contraseña**, validados contra `users` (`getUserByDashboardCreds`).
+  El `user.id` se firma dentro del `code` (HMAC con `MCP_API_KEY` como secreto de
+  firma del servidor) y `/api/oauth/token` devuelve el `mcp_token` **de ese
+  usuario** (`getMcpTokenByUserId`). `client_credentials` exige que el secreto sea
+  un `mcp_token` válido y lo devuelve tal cual. Antes el OAuth era single-user
+  (devolvía siempre `MCP_API_KEY`) — corregido.
 - **Dashboard** (`middleware.ts`): Basic auth se resuelve contra
   `users.dashboard_user`/`dashboard_pass`; el `user_id` se propaga por el header
   `x-recall-user-id`. Server Components y route handlers lo leen con

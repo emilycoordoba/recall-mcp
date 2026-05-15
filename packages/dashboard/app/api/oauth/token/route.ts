@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "crypto";
+import { getMcpTokenByUserId } from "@/lib/auth-shared";
+import { getUserByToken } from "@/lib/db-mcp";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -74,19 +76,31 @@ export async function POST(request: Request) {
       );
     }
 
+    // Hand back the resolved user's own MCP token (per-user isolation).
+    const uid = Number(payload.uid);
+    const userToken = Number.isInteger(uid) ? await getMcpTokenByUserId(uid) : null;
+    if (!userToken) {
+      return Response.json(
+        { error: "invalid_grant", error_description: "unknown user" },
+        { status: 400, headers: CORS },
+      );
+    }
     return Response.json(
-      { access_token: process.env.MCP_API_KEY, token_type: "Bearer", expires_in: 86400 },
+      { access_token: userToken, token_type: "Bearer", expires_in: 86400 },
       { headers: CORS },
     );
   }
 
   if (grantType === "client_credentials") {
+    // The client secret must itself be a valid user MCP token; echo it back so
+    // the caller stays scoped to that user.
     const { clientSecret } = extractCredentials(request, body);
-    if (!process.env.MCP_API_KEY || clientSecret !== process.env.MCP_API_KEY) {
+    const user = clientSecret ? await getUserByToken(clientSecret) : null;
+    if (!user) {
       return Response.json({ error: "invalid_client" }, { status: 401, headers: CORS });
     }
     return Response.json(
-      { access_token: process.env.MCP_API_KEY, token_type: "Bearer", expires_in: 86400 },
+      { access_token: clientSecret, token_type: "Bearer", expires_in: 86400 },
       { headers: CORS },
     );
   }

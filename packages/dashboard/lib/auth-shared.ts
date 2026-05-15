@@ -27,3 +27,15 @@ export async function getUserByDashboardCreds(
   if (error) throw error;
   return data ?? null;
 }
+
+// Returns the MCP bearer token for a user id. Used by the OAuth token endpoint
+// to hand each user *their own* token instead of a shared one.
+export async function getMcpTokenByUserId(id: number): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("mcp_token")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.mcp_token ?? null;
+}
