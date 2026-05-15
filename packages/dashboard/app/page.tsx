@@ -1,8 +1,7 @@
 import Link from "next/link"
 import { getTopics, getStudyStreak, type TopicRow } from "@/lib/db"
+import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
-
-export const revalidate = 30
 
 function groupStats(topics: TopicRow[]) {
   const map = new Map<string, TopicRow[]>()
@@ -26,7 +25,8 @@ function groupStats(topics: TopicRow[]) {
 }
 
 export default async function DashboardPage() {
-  const [topics, streak] = await Promise.all([getTopics(), getStudyStreak()])
+  const userId = await currentUserId()
+  const [topics, streak] = await Promise.all([getTopics(userId), getStudyStreak(userId)])
   const groups = Array.from(new Set(topics.map((t) => t.group_name).filter(Boolean))) as string[]
   const stats = groupStats(topics)
 
@@ -45,6 +45,9 @@ export default async function DashboardPage() {
               🔥 {streak} {streak === 1 ? "día" : "días"}
             </span>
           )}
+          <Link href="/sessions" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+            Sesiones →
+          </Link>
           <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Historial →
           </Link>

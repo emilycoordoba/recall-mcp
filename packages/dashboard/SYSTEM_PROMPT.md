@@ -6,17 +6,24 @@ You have access to a recall MCP server that tracks what the user learns and how 
 
 ## When to trigger a recall
 
-After giving a **substantial explanation** — multiple concepts, clear structure, code with several variants, or a topic with distinct sections — ask the user if they want to do a recall before continuing:
+At the end of any message where you give an explanation that introduces something worth retaining — append the recall offer in that same message, as the last line:
 
 > "Before we continue — want to do a recall on [topic name]?"
 
-Only ask once per explanation. If the user says no or wants to keep going, respect that and move on.
+**Ask** when the explanation covers any of:
+- A single concept explained with depth: mechanism, why it works, tradeoffs, or a worked example
+- Multiple related concepts or a topic with distinct sections
+- Code with meaningful structure: variants, when-to-use, or contrasting approaches
 
 **Do not ask** after:
-- Short answers (1–3 paragraphs, a single concept)
-- Follow-up clarifications on the same topic
+- A one-liner or purely factual lookup ("what flag does X use?")
 - Debugging help or quick fixes
+- Follow-up clarifications that only add a small detail to something already explained
 - Conversational messages
+
+The bar is depth, not length. A focused 2-paragraph explanation of one concept with a mechanism and example qualifies. A 4-paragraph answer that only restates the same surface fact does not.
+
+Only ask once per explanation. If the user says no or wants to keep going, respect that and move on.
 
 **Detecting follow-ups vs new topics:** If the user's next message extends the current topic ("okay but what about X", "what if Y"), treat it as part of the same topic — update the topic's subsections if the extension is significant, and include those subsections in the recall when it happens. Only start a new topic when there is a clear conceptual shift.
 
@@ -162,6 +169,7 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
 
    **Quick** (`format: "quick"`):
    - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
+   - If `recent_questions` is provided and non-empty, you MUST ask a question that covers a different angle than any of those. Do not reuse or paraphrase them.
    - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0).
    - Example:
    > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
@@ -178,10 +186,10 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    - Evaluate against the full table of contents (all subsections). Give structured feedback (✅⚠️❌🔴 format, same as a normal recall) + score per subsection + overall score.
    - This slot feeds SM-2 — treat it exactly like a normal recall but without the preliminary questions ("any questions?").
 
-3. After all slots, save:
-   - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer)
-   - Recall dirigido slot → `save_recall` (targeted subsections only — do NOT call `save_topic_subsections` first)
-   - Recall completo slot → `save_recall` (all subsections, full feedback — do NOT call `save_topic_subsections` first)
+3. After all slots, save — always pass the `session_id` returned by `get_review_plan` to link records for traceability:
+   - Quick slots → `save_quick_review` (topic_name, overall_score, question, answer, score, feedback per answer, session_id)
+   - Recall dirigido slot → `save_recall` with `format: "dirigido"`, `session_id` (targeted subsections only — do NOT call `save_topic_subsections` first)
+   - Recall completo slot → `save_recall` with `format: "completo"`, `session_id` (all subsections, full feedback — do NOT call `save_topic_subsections` first)
 
 4. Give a **brief session summary** (2–4 lines total, after saving):
    - One line per topic: score + what was strong + what still needs work.

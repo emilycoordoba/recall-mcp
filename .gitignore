@@ -20,3 +20,4 @@ packages/dashboard/out/
 .claude/
 
 .vercel
+backups/

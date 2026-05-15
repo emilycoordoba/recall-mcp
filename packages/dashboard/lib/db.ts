@@ -76,10 +76,10 @@ export interface QuickReviewAnswerRow {
   feedback: string | null;
 }
 
-export async function getStudyStreak(): Promise<number> {
+export async function getStudyStreak(userId: number): Promise<number> {
   const [{ data: recalls }, { data: qrs }] = await Promise.all([
-    supabase.from("recalls").select("recalled_at"),
-    supabase.from("quick_review_sessions").select("reviewed_at"),
+    supabase.from("recalls").select("recalled_at").eq("user_id", userId),
+    supabase.from("quick_review_sessions").select("reviewed_at").eq("user_id", userId),
   ]);
 
   const allDays = new Set([
@@ -96,21 +96,22 @@ export async function getStudyStreak(): Promise<number> {
   return streak;
 }
 
-export async function getTopics(): Promise<TopicRow[]> {
+export async function getTopics(userId: number): Promise<TopicRow[]> {
   const { data, error } = await supabase
     .from("topics")
     .select(`
       id, name, description, created_at, group_id,
       topic_groups(name),
-      recalls(overall_score, recalled_at),
+      recalls(overall_score, recalled_at, format),
       quick_review_sessions(reviewed_at, overall_score)
     `)
+    .eq("user_id", userId)
     .order("name");
 
   if (error) throw error;
 
   return (data ?? []).map((t) => {
-    const recalls = (t.recalls as { overall_score: number; recalled_at: string }[]) ?? [];
+    const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
     const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number }[]) ?? [];
 
     // All sessions sorted most recent first
@@ -154,8 +155,10 @@ export async function getTopics(): Promise<TopicRow[]> {
       score_trend = diff > 0.3 ? "up" : diff < -0.3 ? "down" : "flat";
     }
 
-    // SM-2: compute interval from full recall history (chronological)
-    const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+    // SM-2: only full recalls count toward interval — directed recalls are partial and don't evidence full retention
+    const sortedForSM2 = recalls
+      .filter((r) => (r.format ?? "completo") === "completo")
+      .sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
     let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
     for (const r of sortedForSM2) {
       const q = r.overall_score ?? 0;
@@ -215,11 +218,12 @@ export async function getTopics(): Promise<TopicRow[]> {
   });
 }
 
-export async function getTopic(id: number): Promise<TopicDetail | undefined> {
+export async function getTopic(id: number, userId: number): Promise<TopicDetail | undefined> {
   const { data, error } = await supabase
     .from("topics")
     .select("id, name, description, created_at, group_id, topic_groups(name)")
     .eq("id", id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (error) throw error;
@@ -235,11 +239,12 @@ export async function getTopic(id: number): Promise<TopicDetail | undefined> {
   };
 }
 
-export async function getSubsections(topicId: number): Promise<Subsection[]> {
+export async function getSubsections(topicId: number, userId: number): Promise<Subsection[]> {
   const { data, error } = await supabase
     .from("topic_subsections")
     .select("*")
     .eq("topic_id", topicId)
+    .eq("user_id", userId)
     .order("order_index");
 
   if (error) throw error;
@@ -252,11 +257,12 @@ export interface SubsectionStat extends Subsection {
   mastered: boolean;
 }
 
-export async function getSubsectionStats(topicId: number): Promise<SubsectionStat[]> {
+export async function getSubsectionStats(topicId: number, userId: number): Promise<SubsectionStat[]> {
   const { data, error } = await supabase
     .from("topic_subsections")
     .select("id, topic_id, name, order_index, recall_subsections(recall_id, covered, score), quick_review_answers(score)")
     .eq("topic_id", topicId)
+    .eq("user_id", userId)
     .order("order_index");
 
   if (error) throw error;
@@ -274,22 +280,25 @@ export async function getSubsectionStats(topicId: number): Promise<SubsectionSta
   });
 }
 
-export async function getRecalls(topicId: number): Promise<RecallRow[]> {
+export async function getRecalls(topicId: number, userId: number): Promise<RecallRow[]> {
   const { data, error } = await supabase
     .from("recalls")
     .select("*")
     .eq("topic_id", topicId)
+    .eq("user_id", userId)
     .order("recalled_at", { ascending: false });
 
   if (error) throw error;
   return (data ?? []) as RecallRow[];
 }
 
-export async function getRecallSubsections(recallId: number): Promise<RecallSubsectionRow[]> {
+export async function getRecallSubsections(recallId: number, userId: number): Promise<RecallSubsectionRow[]> {
+  // recall_subsections has no user_id; scope via the owning recall (inner join).
   const { data, error } = await supabase
     .from("recall_subsections")
-    .select("recall_id, subsection_id, covered, score, topic_subsections(name, order_index)")
+    .select("recall_id, subsection_id, covered, score, topic_subsections(name, order_index), recalls!inner(user_id)")
     .eq("recall_id", recallId)
+    .eq("recalls.user_id", userId)
     .order("order_index", { referencedTable: "topic_subsections" });
 
   if (error) throw error;
@@ -303,11 +312,12 @@ export async function getRecallSubsections(recallId: number): Promise<RecallSubs
   }));
 }
 
-export async function getQuickReviews(topicId: number): Promise<QuickReviewRow[]> {
+export async function getQuickReviews(topicId: number, userId: number): Promise<QuickReviewRow[]> {
   const { data, error } = await supabase
     .from("quick_review_sessions")
     .select("id, topic_id, reviewed_at, overall_score, feedback")
     .eq("topic_id", topicId)
+    .eq("user_id", userId)
     .order("reviewed_at", { ascending: false });
 
   if (error) throw error;
@@ -341,7 +351,7 @@ export interface HistoryEntry {
   answers: HistoryAnswer[];
 }
 
-export async function getHistory(): Promise<HistoryEntry[]> {
+export async function getHistory(userId: number): Promise<HistoryEntry[]> {
   const [{ data: recalls, error: re }, { data: qrs, error: qe }] = await Promise.all([
     supabase
       .from("recalls")
@@ -350,6 +360,7 @@ export async function getHistory(): Promise<HistoryEntry[]> {
         topics(name, topic_groups(name)),
         recall_subsections(covered, score, topic_subsections(name, order_index))
       `)
+      .eq("user_id", userId)
       .order("recalled_at", { ascending: false }),
     supabase
       .from("quick_review_sessions")
@@ -358,6 +369,7 @@ export async function getHistory(): Promise<HistoryEntry[]> {
         topics(name, topic_groups(name)),
         quick_review_answers(question, answer, score, feedback, topic_subsections(name))
       `)
+      .eq("user_id", userId)
       .order("reviewed_at", { ascending: false }),
   ]);
 
@@ -403,11 +415,88 @@ export async function getHistory(): Promise<HistoryEntry[]> {
   return [...recallEntries, ...qrEntries].sort((a, b) => b.date.localeCompare(a.date));
 }
 
-export async function getQuickReviewAnswers(sessionId: number): Promise<QuickReviewAnswerRow[]> {
+export interface ReviewSessionSlot {
+  slot_number: number;
+  format: "quick" | "recall_dirigido" | "recall_completo";
+  topic_id: number;
+  topic_name: string;
+  subsection_names: string[];
+  score: number | null;
+  record_type: "recall" | "quick_review" | null;
+  record_id: number | null;
+}
+
+export interface ReviewSessionEntry {
+  id: number;
+  started_at: string;
+  group_name: string | null;
+  slots: ReviewSessionSlot[];
+}
+
+export async function getReviewSessions(userId: number): Promise<ReviewSessionEntry[]> {
+  const { data, error } = await supabase
+    .from("review_sessions")
+    .select(`
+      id, started_at, group_name,
+      review_session_slots(slot_number, format, subsection_names, topics(id, name)),
+      recalls(id, topic_id, overall_score, review_session_id),
+      quick_review_sessions(id, topic_id, overall_score, review_session_id)
+    `)
+    .eq("user_id", userId)
+    .order("started_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  return ((data ?? []) as any[]).map((session) => {
+    const recalls: { id: number; topic_id: number; overall_score: number | null }[] = session.recalls ?? [];
+    const qrs: { id: number; topic_id: number; overall_score: number | null }[] = session.quick_review_sessions ?? [];
+
+    const recallByTopic = new Map(recalls.map((r) => [r.topic_id, r]));
+    const qrByTopic = new Map(qrs.map((q) => [q.topic_id, q]));
+
+    const slots: ReviewSessionSlot[] = ((session.review_session_slots ?? []) as any[])
+      .sort((a: any, b: any) => a.slot_number - b.slot_number)
+      .map((slot: any) => {
+        const topicId = (slot.topics as { id: number; name: string } | null)?.id ?? 0;
+        const topicName = (slot.topics as { id: number; name: string } | null)?.name ?? "?";
+        const format = slot.format as ReviewSessionSlot["format"];
+
+        const recall = recallByTopic.get(topicId);
+        const qr = qrByTopic.get(topicId);
+
+        // recall_completo and recall_dirigido link to recalls; quick links to quick_review_sessions
+        const linked = format === "quick" ? qr : recall;
+        const recordType = format === "quick" ? (qr ? "quick_review" : null) : (recall ? "recall" : null);
+
+        return {
+          slot_number: slot.slot_number,
+          format,
+          topic_id: topicId,
+          topic_name: topicName,
+          subsection_names: slot.subsection_names ?? [],
+          score: linked?.overall_score ?? null,
+          record_type: recordType,
+          record_id: linked?.id ?? null,
+        };
+      });
+
+    return {
+      id: session.id,
+      started_at: session.started_at,
+      group_name: session.group_name,
+      slots,
+    };
+  });
+}
+
+export async function getQuickReviewAnswers(sessionId: number, userId: number): Promise<QuickReviewAnswerRow[]> {
+  // quick_review_answers has no user_id; scope via the owning session (inner join).
   const { data, error } = await supabase
     .from("quick_review_answers")
-    .select("id, session_id, question, answer, score, feedback, topic_subsections(name)")
+    .select("id, session_id, question, answer, score, feedback, topic_subsections(name), quick_review_sessions!inner(user_id)")
     .eq("session_id", sessionId)
+    .eq("quick_review_sessions.user_id", userId)
     .order("id");
 
   if (error) throw error;

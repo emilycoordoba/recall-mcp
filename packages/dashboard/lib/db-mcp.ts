@@ -14,6 +14,8 @@ export interface SaveRecallInput {
   transcript?: string;
   feedback?: string;
   overall_score: number;
+  format?: "completo" | "dirigido";
+  session_id?: number;
   subsections: SubsectionInput[];
 }
 
@@ -35,6 +37,7 @@ export interface SaveQuickReviewInput {
   topic_name: string;
   overall_score: number;
   feedback?: string;
+  session_id?: number;
   answers: QuickReviewAnswerInput[];
 }
 
@@ -62,39 +65,60 @@ export interface ReviewCandidate {
   next_review_date: string | null;
   days_overdue: number;
   sm2_interval: number;
-  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean }[];
+  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
+}
+
+// ─── User resolution ──────────────────────────────────────────────────────────
+
+export interface User {
+  id: number;
+  name: string;
+}
+
+// Resolves the user owning a given MCP bearer token. Returns null when the token
+// is unknown — callers must treat that as 401.
+export async function getUserByToken(token: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name")
+    .eq("mcp_token", token)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getOrCreateGroup(name: string): Promise<number> {
+async function getOrCreateGroup(name: string, userId: number): Promise<number> {
   const { data: existing } = await supabase
     .from("topic_groups")
     .select("id")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (existing) return existing.id;
 
   const { data, error } = await supabase
     .from("topic_groups")
-    .insert({ name })
+    .insert({ name, user_id: userId })
     .select("id")
     .single();
   if (error) throw error;
   return data.id;
 }
 
-async function getOrCreateTopic(name: string, groupId: number | null): Promise<number> {
+async function getOrCreateTopic(name: string, groupId: number | null, userId: number): Promise<number> {
   const { data: existing } = await supabase
     .from("topics")
     .select("id")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (existing) return existing.id;
 
   const { data, error } = await supabase
     .from("topics")
-    .insert({ name, group_id: groupId })
+    .insert({ name, group_id: groupId, user_id: userId })
     .select("id")
     .single();
   if (error) throw error;
@@ -103,16 +127,18 @@ async function getOrCreateTopic(name: string, groupId: number | null): Promise<n
 
 // ─── Read operations ──────────────────────────────────────────────────────────
 
-export async function findTopics(query: string) {
+export async function findTopics(query: string, userId: number) {
   const [{ data: topicData, error: te }, { data: subsData, error: se }] = await Promise.all([
     supabase
       .from("topics")
       .select("id, name, group_id, topic_groups(name)")
+      .eq("user_id", userId)
       .ilike("name", `%${query}%`)
       .order("name"),
     supabase
       .from("topic_subsections")
       .select("name, topic_id, topics(id, name, group_id, topic_groups(name))")
+      .eq("user_id", userId)
       .ilike("name", `%${query}%`),
   ]);
   if (te) throw te;
@@ -155,10 +181,11 @@ export async function findTopics(query: string) {
   return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function getTopicByName(name: string) {
+export async function getTopicByName(name: string, userId: number) {
   const { data, error } = await supabase
     .from("topics")
     .select("id, name, group_id, topic_groups(name)")
+    .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
   if (error) throw error;
@@ -170,11 +197,12 @@ export async function getTopicByName(name: string) {
   };
 }
 
-export async function getTopicHistory(topicId: number) {
+export async function getTopicHistory(topicId: number, userId: number) {
   const { data: topic, error: te } = await supabase
     .from("topics")
     .select("id, name")
     .eq("id", topicId)
+    .eq("user_id", userId)
     .maybeSingle();
   if (te) throw te;
   if (!topic) return null;
@@ -211,16 +239,18 @@ export async function getTopicHistory(topicId: number) {
   return { ...topic, subsections: subsections ?? [], recalls: recallsWithSubs };
 }
 
-export async function listTopics(groupName?: string) {
+export async function listTopics(userId: number, groupName?: string) {
   let query = supabase
     .from("topics")
     .select(`id, name, created_at, group_id, topic_groups(name), recalls(overall_score, recalled_at)`)
+    .eq("user_id", userId)
     .order("name");
 
   if (groupName) {
     const { data: group } = await supabase
       .from("topic_groups")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", groupName)
       .maybeSingle();
     if (group) query = query.eq("group_id", group.id);
@@ -245,10 +275,11 @@ export async function listTopics(groupName?: string) {
 }
 
 export async function filterTopics(
+  userId: number,
   sortBy: "score_asc" | "score_desc" | "date_asc" | "date_desc" | "name",
   groupName?: string,
 ) {
-  const rows = await listTopics(groupName);
+  const rows = await listTopics(userId, groupName);
 
   return rows.sort((a, b) => {
     switch (sortBy) {
@@ -265,26 +296,28 @@ export async function filterTopics(
 // Keeps metrics reflecting current knowledge rather than accumulating indefinitely.
 const RECENT_WINDOW = 5;
 
-export async function getReviewCandidates(groupName?: string): Promise<ReviewCandidate[]> {
+export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase
     .from("topics")
     .select(`
       id, name,
       topic_groups(name),
-      recalls(id, recalled_at, overall_score),
+      recalls(id, recalled_at, overall_score, format),
       quick_review_sessions(id, reviewed_at, overall_score),
       topic_subsections(
         id, name,
         recall_subsections(recall_id, covered, score),
-        quick_review_answers(session_id, score)
+        quick_review_answers(session_id, score, question)
       )
     `)
+    .eq("user_id", userId)
     .order("name");
 
   if (groupName) {
     const { data: group } = await supabase
       .from("topic_groups")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", groupName)
       .maybeSingle();
     if (group) query = query.eq("group_id", group.id);
@@ -295,7 +328,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
   return ((data ?? []) as any[])
     .map((t) => {
-      const recalls: { id: number; recalled_at: string; overall_score: number }[] = t.recalls ?? [];
+      const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
       const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
 
       // Bug 2 fix: urgency uses only full recall dates; display uses any session date
@@ -333,8 +366,10 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
           ? 999
           : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
-      // SM-2: compute interval from full recall history (chronological)
-      const sortedForSM2 = [...recalls].sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+      // SM-2: only full recalls count toward interval — directed recalls are partial and don't evidence full retention
+      const sortedForSM2 = recalls
+        .filter((r) => (r.format ?? "completo") === "completo")
+        .sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
       let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
       for (const r of sortedForSM2) {
         const q = r.overall_score ?? 0;
@@ -356,7 +391,9 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
       const todayIso = new Date().toISOString().slice(0, 10);
       const daysOverdue = nextReviewDate
         ? Math.round((Date.parse(todayIso) - Date.parse(nextReviewDate)) / 86_400_000)
-        : recalls.length === 0 ? 999 : 0;
+        : recalls.length === 0 && qrs.length === 0 ? 999
+        : recalls.length === 0 ? (daysSince ?? 30)
+        : 0;
 
       // Maps for cross-referencing session dates in subsection calculations
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
@@ -364,7 +401,7 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
       const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
         const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
-        const qas: { session_id: number; score: number }[] = s.quick_review_answers ?? [];
+        const qas: { session_id: number; score: number; question: string | null }[] = s.quick_review_answers ?? [];
 
         // Bug 3 fix: avg_score merges recall and quick review scores, ordered by session date
         const recallEntries = rs.map((r) => ({ date: recallDateMap.get(r.recall_id) ?? "", score: r.score }));
@@ -382,7 +419,12 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
         const avg_score = allEntries.length ? allEntries.reduce((acc, e) => acc + e.score, 0) / allEntries.length : null;
         const times_missed = recentRs.filter((r) => !r.covered).length;
         const mastered = allEntries.length >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && times_missed === 0;
-        return { name: s.name, avg_score, times_missed, mastered };
+        const recent_questions = [...qas]
+          .sort((a, b) => (qrDateMap.get(b.session_id) ?? "").localeCompare(qrDateMap.get(a.session_id) ?? ""))
+          .slice(0, 5)
+          .map((q) => q.question)
+          .filter((q): q is string => q !== null);
+        return { name: s.name, avg_score, times_missed, mastered, recent_questions };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
 
       return {
@@ -405,15 +447,15 @@ export async function getReviewCandidates(groupName?: string): Promise<ReviewCan
 
 // ─── Write operations ─────────────────────────────────────────────────────────
 
-export async function saveTopicSubsections(input: SaveTopicSubsectionsInput) {
-  const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
-  const topicId = await getOrCreateTopic(input.topic_name, groupId);
+export async function saveTopicSubsections(input: SaveTopicSubsectionsInput, userId: number) {
+  const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
+  const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
 
   // Upsert with correct order (updates order_index on existing subsections too)
   await supabase
     .from("topic_subsections")
     .upsert(
-      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i })),
+      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i, user_id: userId })),
       { onConflict: "topic_id,name", ignoreDuplicates: false },
     );
 
@@ -447,17 +489,20 @@ export async function saveTopicSubsections(input: SaveTopicSubsectionsInput) {
   return { topic_id: topicId, subsections: subsections ?? [] };
 }
 
-export async function saveRecall(input: SaveRecallInput) {
-  const groupId = input.group_name ? await getOrCreateGroup(input.group_name) : null;
-  const topicId = await getOrCreateTopic(input.topic_name, groupId);
+export async function saveRecall(input: SaveRecallInput, userId: number) {
+  const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
+  const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
 
   const { data: recall, error: re } = await supabase
     .from("recalls")
     .insert({
       topic_id: topicId,
+      user_id: userId,
       transcript: input.transcript ?? null,
       feedback: input.feedback ?? null,
       overall_score: input.overall_score,
+      format: input.format ?? "completo",
+      review_session_id: input.session_id ?? null,
     })
     .select("id")
     .single();
@@ -487,13 +532,13 @@ export async function saveRecall(input: SaveRecallInput) {
   return { recall_id: recallId, topic_id: topicId };
 }
 
-export async function saveQuickReview(input: SaveQuickReviewInput) {
-  const topic = await getTopicByName(input.topic_name);
+export async function saveQuickReview(input: SaveQuickReviewInput, userId: number) {
+  const topic = await getTopicByName(input.topic_name, userId);
   if (!topic) return { success: false as const, error: `Topic "${input.topic_name}" no encontrado` };
 
   const { data: session, error: se } = await supabase
     .from("quick_review_sessions")
-    .insert({ topic_id: topic.id, overall_score: input.overall_score, feedback: input.feedback ?? null })
+    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null })
     .select("id")
     .single();
   if (se) throw se;
@@ -520,8 +565,8 @@ export async function saveQuickReview(input: SaveQuickReviewInput) {
   return { success: true as const, session_id: session.id, topic_id: topic.id };
 }
 
-export async function updateSubsectionName(topicName: string, oldName: string, newName: string) {
-  const topic = await getTopicByName(topicName);
+export async function updateSubsectionName(topicName: string, oldName: string, newName: string, userId: number) {
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const { data: sub } = await supabase
@@ -542,11 +587,12 @@ export async function updateSubsectionName(topicName: string, oldName: string, n
   return { success: true, updated: { topic: topicName, old_name: oldName, new_name: newName } };
 }
 
-export async function updateRecallFeedback(recallId: number, feedback: string) {
+export async function updateRecallFeedback(recallId: number, feedback: string, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
     .update({ feedback })
     .eq("id", recallId)
+    .eq("user_id", userId)
     .select("id")
     .maybeSingle();
 
@@ -555,11 +601,38 @@ export async function updateRecallFeedback(recallId: number, feedback: string) {
   return { success: true, updated_recall_id: recallId };
 }
 
+export async function updateTopicById(
+  id: number,
+  updates: { name?: string },
+  userId: number,
+) {
+  const patch: Record<string, unknown> = {};
+
+  if (updates.name !== undefined) {
+    const { data: existing } = await supabase
+      .from("topics")
+      .select("id")
+      .eq("user_id", userId)
+      .ilike("name", updates.name)
+      .neq("id", id)
+      .maybeSingle();
+    if (existing) return { success: false, error: `Ya existe un topic llamado "${updates.name}"` };
+    patch.name = updates.name;
+  }
+
+  if (Object.keys(patch).length === 0) return { success: true, topic_id: id };
+
+  const { error } = await supabase.from("topics").update(patch).eq("id", id).eq("user_id", userId);
+  if (error) return { success: false, error: error.message };
+  return { success: true, topic_id: id };
+}
+
 export async function updateTopic(
   topicName: string,
   updates: { new_name?: string; group_name?: string | null },
+  userId: number,
 ) {
-  const topic = await getTopicByName(topicName);
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const patch: Record<string, unknown> = {};
@@ -568,6 +641,7 @@ export async function updateTopic(
     const { data: existing } = await supabase
       .from("topics")
       .select("id")
+      .eq("user_id", userId)
       .ilike("name", updates.new_name)
       .neq("id", topic.id)
       .maybeSingle();
@@ -577,20 +651,21 @@ export async function updateTopic(
 
   if (updates.group_name !== undefined) {
     patch.group_id = updates.group_name !== null
-      ? await getOrCreateGroup(updates.group_name)
+      ? await getOrCreateGroup(updates.group_name, userId)
       : null;
   }
 
-  const { error } = await supabase.from("topics").update(patch).eq("id", topic.id);
+  const { error } = await supabase.from("topics").update(patch).eq("id", topic.id).eq("user_id", userId);
   if (error) return { success: false, error: error.message };
   return { success: true, topic_id: topic.id };
 }
 
-export async function deleteRecall(recallId: number) {
+export async function deleteRecall(recallId: number, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
     .delete()
     .eq("id", recallId)
+    .eq("user_id", userId)
     .select("id, topic_id")
     .maybeSingle();
 
@@ -599,9 +674,9 @@ export async function deleteRecall(recallId: number) {
   return { success: true, deleted_recall_id: recallId, topic_id: data.topic_id };
 }
 
-export async function mergeTopics(sourceName: string, targetName: string) {
-  const source = await getTopicByName(sourceName);
-  const target = await getTopicByName(targetName);
+export async function mergeTopics(sourceName: string, targetName: string, userId: number) {
+  const source = await getTopicByName(sourceName, userId);
+  const target = await getTopicByName(targetName, userId);
 
   if (!source) return { success: false, error: `Topic origen "${sourceName}" no encontrado` };
   if (!target) return { success: false, error: `Topic destino "${targetName}" no encontrado` };
@@ -630,17 +705,18 @@ export async function mergeTopics(sourceName: string, targetName: string) {
         topic_id: target.id,
         name: s.name,
         order_index: (targetCount ?? 0) + i,
+        user_id: userId,
       })),
       { onConflict: "topic_id,name", ignoreDuplicates: true },
     );
 
-  await supabase.from("topics").delete().eq("id", source.id);
+  await supabase.from("topics").delete().eq("id", source.id).eq("user_id", userId);
 
   return { success: true, merged_into: targetName, subsections_moved: (sourceSubs ?? []).length };
 }
 
-export async function deleteTopic(topicName: string) {
-  const topic = await getTopicByName(topicName);
+export async function deleteTopic(topicName: string, userId: number) {
+  const topic = await getTopicByName(topicName, userId);
   if (!topic) return { success: false, error: `Topic "${topicName}" no encontrado` };
 
   const { count } = await supabase
@@ -648,7 +724,7 @@ export async function deleteTopic(topicName: string) {
     .select("id", { count: "exact", head: true })
     .eq("topic_id", topic.id);
 
-  await supabase.from("topics").delete().eq("id", topic.id);
+  await supabase.from("topics").delete().eq("id", topic.id).eq("user_id", userId);
 
   return { success: true, deleted_topic: topicName, recalls_deleted: count ?? 0 };
 }
@@ -666,25 +742,62 @@ export interface ReviewSlot {
   total_recalls: number;
   target_subsection?: string;
   target_subsections?: string[];
+  recent_questions?: string[];
 }
 
-export async function getReviewPlan(groupName?: string): Promise<{ slots: ReviewSlot[]; message?: string }> {
-  const candidates = await getReviewCandidates(groupName);
+// How many recent sessions slot-1 topics are excluded from slot 1 again.
+// 2 means: if a topic was slot 1 in either of the last 2 sessions, skip it.
+const SLOT1_COOLDOWN_SESSIONS = 2;
+
+export async function getReviewPlan(userId: number, groupName?: string): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string }> {
+  const [candidates, { data: recentSlotRows }] = await Promise.all([
+    getReviewCandidates(userId, groupName),
+    supabase
+      .from("review_session_slots")
+      .select("topic_id, slot_number, subsection_names, session_id")
+      .eq("user_id", userId)
+      .order("id", { ascending: false })
+      .limit(SLOT1_COOLDOWN_SESSIONS * 4 + 4), // enough rows to cover recent sessions
+  ]);
+
   if (candidates.length === 0) return { slots: [], message: "No hay topics registrados para repasar." };
+
+  // Topics that occupied slot 1 in the last SLOT1_COOLDOWN_SESSIONS sessions → cooldown
+  const slot1Rows = (recentSlotRows ?? []).filter((r) => r.slot_number === 1);
+  const recentSessionIds = [...new Set(slot1Rows.map((r) => r.session_id))].slice(0, SLOT1_COOLDOWN_SESSIONS);
+  const cooledTopics = new Set(
+    slot1Rows.filter((r) => recentSessionIds.includes(r.session_id)).map((r) => r.topic_id),
+  );
+
+  // Last subsection targeted per topic (for rotation across bottom-3)
+  const lastSubByTopic = new Map<number, string>();
+  for (const r of (recentSlotRows ?? [])) {
+    if (!lastSubByTopic.has(r.topic_id) && r.subsection_names?.length > 0) {
+      lastSubByTopic.set(r.topic_id, r.subsection_names[0]);
+    }
+  }
 
   const used = new Set<number>();
 
+  // Picks from the bottom-3 weakest unmastered subsections, rotating away from the last one asked.
   function weakestQuickSubsection(c: ReviewCandidate): string {
     const pool = c.subsections.filter((s) => !s.mastered);
     const ranked = [...(pool.length > 0 ? pool : c.subsections)]
       .sort((a, b) => (a.avg_score ?? 0) - (b.avg_score ?? 0));
-    return ranked[0]?.name ?? "general";
+    const bottom3 = ranked.slice(0, 3);
+    const lastSub = lastSubByTopic.get(c.topic_id);
+    const rotated = lastSub ? (bottom3.find((s) => s.name !== lastSub) ?? bottom3[0]) : bottom3[0];
+    return rotated?.name ?? "general";
+  }
+
+  function recentQuestionsFor(c: ReviewCandidate, subsectionName: string): string[] {
+    return c.subsections.find((s) => s.name === subsectionName)?.recent_questions ?? [];
   }
 
   function weakestRecallSubsections(c: ReviewCandidate): string[] {
     return [...c.subsections]
       .filter((s) => !s.mastered)
-      .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0 && s.times_missed === 0))
+      .filter((s) => !(s.avg_score !== null && s.avg_score >= 4.0))
       .sort((a, b) => b.times_missed - a.times_missed || (a.avg_score ?? 0) - (b.avg_score ?? 0))
       .slice(0, 3)
       .map((s) => s.name);
@@ -692,21 +805,24 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
 
   const slots: ReviewSlot[] = [];
 
-  // Slot 1: más urgente por tiempo
-  const s1 = candidates.find((c) => !used.has(c.topic_id));
+  // Slot 1: más urgente por tiempo — aplica cooldown para no repetir el mismo topic sesión tras sesión
+  const s1 = candidates.find((c) => !used.has(c.topic_id) && !cooledTopics.has(c.topic_id))
+    ?? candidates.find((c) => !used.has(c.topic_id)); // fallback si todos están en cooldown
   if (s1) {
     used.add(s1.topic_id);
+    const s1Target = weakestQuickSubsection(s1);
     slots.push({
       slot: 1, purpose: "most_urgent", format: "quick",
       topic_id: s1.topic_id, topic_name: s1.topic_name, group_name: s1.group_name,
       days_since_recall: s1.days_since_recall, days_since_full_recall: s1.days_since_full_recall,
       avg_score: s1.avg_score, total_recalls: s1.total_recalls,
-      target_subsection: weakestQuickSubsection(s1),
+      target_subsection: s1Target,
+      recent_questions: recentQuestionsFor(s1, s1Target),
     });
   }
 
-  // Slot 2: subsección más fallada (times_missed >= 2) → recall dirigido
-  const s2 = candidates.find((c) => !used.has(c.topic_id) && c.subsections.some((s) => s.times_missed >= 2));
+  // Slot 2: misses persistentes en recalls Y avg_score bajo (incluye QRs) → recall dirigido
+  const s2 = candidates.find((c) => !used.has(c.topic_id) && c.subsections.some((s) => s.times_missed >= 2 && (s.avg_score ?? 0) < 4.0));
   if (s2) {
     used.add(s2.topic_id);
     slots.push({
@@ -720,12 +836,14 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     const fallback = candidates.find((c) => !used.has(c.topic_id));
     if (fallback) {
       used.add(fallback.topic_id);
+      const fbTarget = weakestQuickSubsection(fallback);
       slots.push({
         slot: 2, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
         days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
         avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
-        target_subsection: weakestQuickSubsection(fallback),
+        target_subsection: fbTarget,
+        recent_questions: recentQuestionsFor(fallback, fbTarget),
       });
     }
   }
@@ -733,29 +851,33 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
   // Slot 3: consolidación (practicado ≥3 veces, bien aprendido, sin tocar ≥7 días)
   const s3 = candidates.find((c) =>
     !used.has(c.topic_id) &&
-    c.total_recalls >= 3 &&
+    c.total_recalls >= 1 &&
     c.avg_score !== null && c.avg_score >= 3.5 &&
     c.days_since_recall !== null && c.days_since_recall >= 7,
   );
   if (s3) {
     used.add(s3.topic_id);
+    const s3Target = weakestQuickSubsection(s3);
     slots.push({
       slot: 3, purpose: "consolidation", format: "quick",
       topic_id: s3.topic_id, topic_name: s3.topic_name, group_name: s3.group_name,
       days_since_recall: s3.days_since_recall, days_since_full_recall: s3.days_since_full_recall,
       avg_score: s3.avg_score, total_recalls: s3.total_recalls,
-      target_subsection: weakestQuickSubsection(s3),
+      target_subsection: s3Target,
+      recent_questions: recentQuestionsFor(s3, s3Target),
     });
   } else {
     const fallback = candidates.find((c) => !used.has(c.topic_id));
     if (fallback) {
       used.add(fallback.topic_id);
+      const fbTarget = weakestQuickSubsection(fallback);
       slots.push({
         slot: 3, purpose: "fallback", format: "quick",
         topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
         days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
         avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
-        target_subsection: weakestQuickSubsection(fallback),
+        target_subsection: fbTarget,
+        recent_questions: recentQuestionsFor(fallback, fbTarget),
       });
     }
   }
@@ -776,18 +898,45 @@ export async function getReviewPlan(groupName?: string): Promise<{ slots: Review
     });
   }
 
-  return { slots };
+  // Persist the session for traceability and future cooldown calculations
+  let session_id: number | undefined;
+  try {
+    const { data: session, error: se } = await supabase
+      .from("review_sessions")
+      .insert({ group_name: groupName ?? null, user_id: userId })
+      .select("id")
+      .single();
+    if (!se && session) {
+      session_id = session.id;
+      await supabase.from("review_session_slots").insert(
+        slots.map((slot) => ({
+          session_id: session.id,
+          user_id: userId,
+          slot_number: slot.slot,
+          topic_id: slot.topic_id,
+          format: slot.format,
+          subsection_names: slot.target_subsection
+            ? [slot.target_subsection]
+            : (slot.target_subsections ?? []),
+        })),
+      );
+    }
+  } catch {
+    // Session persistence is best-effort — don't fail the plan if it errors
+  }
+
+  return { slots, session_id };
 }
 
-export async function getStats(): Promise<Stats> {
+export async function getStats(userId: number): Promise<Stats> {
   const [
     { data: topics },
     { data: recalls },
     { data: qrs },
   ] = await Promise.all([
-    supabase.from("topics").select("id, topic_groups(name)"),
-    supabase.from("recalls").select("topic_id, recalled_at, overall_score"),
-    supabase.from("quick_review_sessions").select("topic_id, reviewed_at"),
+    supabase.from("topics").select("id, topic_groups(name)").eq("user_id", userId),
+    supabase.from("recalls").select("topic_id, recalled_at, overall_score").eq("user_id", userId),
+    supabase.from("quick_review_sessions").select("topic_id, reviewed_at").eq("user_id", userId),
   ]);
 
   const totalTopics = topics?.length ?? 0;

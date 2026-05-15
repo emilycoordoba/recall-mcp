@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
+import { currentUserId } from "@/lib/auth"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BackButton } from "@/components/back-button"
@@ -16,11 +17,12 @@ export default async function TopicPage({
   const topicId = parseInt(id, 10)
   if (isNaN(topicId)) notFound()
 
+  const userId = await currentUserId()
   const [topic, subsections, rawRecalls, rawQuickReviews] = await Promise.all([
-    getTopic(topicId),
-    getSubsectionStats(topicId),
-    getRecalls(topicId),
-    getQuickReviews(topicId),
+    getTopic(topicId, userId),
+    getSubsectionStats(topicId, userId),
+    getRecalls(topicId, userId),
+    getQuickReviews(topicId, userId),
   ])
   if (!topic) notFound()
 
@@ -28,7 +30,7 @@ export default async function TopicPage({
     rawRecalls.map(async (recall) => ({
       type: "recall" as const,
       date: recall.recalled_at,
-      data: { ...recall, subsections: await getRecallSubsections(recall.id) },
+      data: { ...recall, subsections: await getRecallSubsections(recall.id, userId) },
     })),
   )
 
@@ -36,7 +38,7 @@ export default async function TopicPage({
     rawQuickReviews.map(async (qr) => ({
       type: "quick" as const,
       date: qr.reviewed_at,
-      data: { ...qr, answers: await getQuickReviewAnswers(qr.id) },
+      data: { ...qr, answers: await getQuickReviewAnswers(qr.id, userId) },
     })),
   )
 
