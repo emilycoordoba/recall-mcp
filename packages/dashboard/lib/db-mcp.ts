@@ -366,25 +366,40 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
           ? 999
           : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
-      // SM-2: only full recalls count toward interval — directed recalls are partial and don't evidence full retention
-      const sortedForSM2 = recalls
+      // SM-2 source + interval ladder depend on practice type:
+      //  - Topics with full recalls (conceptual, e.g. Emily): unchanged ladder
+      //    [3, 14, ×EF], reset 3 — directed recalls excluded (partial retention).
+      //  - Topics with only quick reviews (procedural practice, e.g. Lesty's
+      //    math): SM-2 is fed by quick reviews with a *dense* ladder
+      //    [1, 3, 7, 16, ×EF], reset 1 — mass early, stretch once mechanized.
+      // Without this, a quick-review-only topic never advances any interval and
+      // scheduling degrades to pure recency (no real spaced repetition).
+      const fullRecalls = recalls
         .filter((r) => (r.format ?? "completo") === "completo")
-        .sort((a, b) => a.recalled_at.localeCompare(b.recalled_at));
+        .map((r) => ({ date: r.recalled_at, q: r.overall_score ?? 0 }));
+      const useRecalls = fullRecalls.length > 0;
+      const smSource = (useRecalls
+        ? fullRecalls
+        : qrs.map((q) => ({ date: q.reviewed_at, q: q.overall_score ?? 0 }))
+      ).sort((a, b) => a.date.localeCompare(b.date));
+      const ladder = useRecalls ? [3, 14] : [1, 3, 7, 16];
+      const failReset = useRecalls ? 3 : 1;
+
       let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
-      for (const r of sortedForSM2) {
-        const q = r.overall_score ?? 0;
+      for (const s of smSource) {
+        const q = s.q;
         if (q >= 3) {
-          if (sm2Reps === 0) sm2Interval = 3;
-          else if (sm2Reps === 1) sm2Interval = 14;
-          else sm2Interval = Math.round(sm2Interval * sm2EF);
+          sm2Interval = sm2Reps < ladder.length
+            ? ladder[sm2Reps]
+            : Math.round(sm2Interval * sm2EF);
           sm2Reps++;
         } else {
           sm2Reps = 0;
-          sm2Interval = 3;
+          sm2Interval = failReset;
         }
         sm2EF = Math.max(1.3, sm2EF + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02));
       }
-      const lastRIso = sortedForSM2.at(-1)?.recalled_at ?? null;
+      const lastRIso = smSource.at(-1)?.date ?? null;
       const nextReviewDate = lastRIso
         ? new Date(new Date(lastRIso).getTime() + sm2Interval * 86_400_000).toISOString().slice(0, 10)
         : null;

@@ -74,6 +74,16 @@ Acotados, casi todo cuelga del topic:
 Cambio de lógica también pendiente: que las sesiones de ejercicios
 (`quick_review`) alimenten el intervalo SM-2 (hoy solo lo hace `format:"completo"`).
 
+**SM-2 alimentado por quick reviews (IMPLEMENTADO).** En `getReviewCandidates`
+(db-mcp.ts) y `getTopics` (db.ts): si el topic no tiene recalls `completo`, SM-2
+se calcula desde los `quick_review_sessions`. Escalera según tipo de práctica:
+- Conceptual (con recalls completos, ej. Emily): `[3, 14]` luego `×EF`,
+  reinicio 3 — **sin cambios**, cero regresión.
+- Procedimental (solo quick reviews, ej. Lesty): escalera densa
+  `[1, 3, 7, 16]` luego `×EF`, reinicio 1 si falla (<3). Elegida por la docente.
+Sin esto, un topic de solo quick-review nunca avanzaba intervalo y el
+agendamiento era pura recencia (sin repetición espaciada real).
+
 ## Tabla de contenido a cargar (grupo `matematica`)
 
 - **Aritmética**: Jerarquía de operaciones · MCM y MCD · Fracciones simples y
