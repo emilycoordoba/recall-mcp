@@ -143,7 +143,11 @@ export function DashboardFilters({ topics, groups }: Props) {
   const router = useRouter()
   const [localTopics, setLocalTopics] = useState(topics)
   const [search, setSearch] = useState("")
-  const [group, setGroup] = useState("all")
+  const [group, setGroup] = useState(() => {
+    if (typeof window === "undefined") return "all"
+    const stored = localStorage.getItem("dashboard-group")
+    return stored && (stored === "all" || groups.includes(stored)) ? stored : "all"
+  })
   const [sort, setSort] = useState<SortKey>(() => {
     if (typeof window === "undefined") return "name"
     return (localStorage.getItem("dashboard-sort") as SortKey) ?? "name"
@@ -198,7 +202,7 @@ export function DashboardFilters({ topics, groups }: Props) {
           className="h-7 w-48 rounded-md border border-input bg-input/20 px-2 py-1.5 text-xs placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
         />
 
-        <Select value={group} onValueChange={setGroup}>
+        <Select value={group} onValueChange={(v) => { setGroup(v); localStorage.setItem("dashboard-group", v) }}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="All groups" />
           </SelectTrigger>
