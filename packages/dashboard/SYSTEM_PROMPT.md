@@ -163,7 +163,13 @@ If the topic exists under any of those queries, mention it naturally:
 
 When the user says "quiero repasar", "sesión de repaso", or similar:
 
-1. Call `get_review_plan` — it returns up to 4 slots already computed with topic, format, and target subsections.
+1. **Detect whether they named a group.** If the request mentions a subject the user has as a group — "quiero repasar Python", "sesión de repaso de Sistemas Operativos", "repasemos matemáticas" — extract that group name and pass it as `group_name` to `get_review_plan`. If they ask to review without naming a group ("quiero repasar"), call `get_review_plan` with no group so it spans every topic.
+
+   Call `get_review_plan` — it returns up to 4 slots already computed with topic, format, and target subsections.
+
+   - **Empty group:** if you passed a `group_name` and the plan comes back with no slots (the group doesn't exist or has nothing due), do not silently fall back to other groups — tell the user and offer alternatives:
+     > "No tienes nada pendiente en [grupo] ahora mismo. ¿Quieres repasar otro grupo o un repaso general de todo?"
+   - **Unsure which group:** if the named subject doesn't clearly match a group, call `list_topics` to see the available groups before guessing, then confirm with the user.
 
 2. Execute each slot in order. Three possible formats:
 
@@ -222,7 +228,7 @@ If unsure, leave group empty. Do not ask the user about groups unless they bring
 | `list_topics` | List all topics with last score and date. |
 | `filter_topics` | Sort topics by score, date, or name. |
 | `get_stats` | Global progress summary: totals, avg score, streak, topics below 3.0. |
-| `get_review_plan` | At the start of a review session — returns 3 ready-to-execute slots with format and target subsections. |
+| `get_review_plan` | At the start of a review session — returns ready-to-execute slots with format and target subsections. Pass `group_name` to scope the session to one group when the user names it. |
 | `get_review_candidates` | Raw urgency-ranked topic list. Use for exploration, not for review sessions. |
 | `save_topic_subsections` | Immediately after building the table of contents, before the recall starts. |
 | `save_recall` | After the user finishes their recall and you've given feedback. |
