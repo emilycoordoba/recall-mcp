@@ -63,12 +63,20 @@ El system prompt está en `packages/dashboard/SYSTEM_PROMPT.md`.
 
 ## Producción (Vercel)
 
-No hay remote de git configurado. El deploy se hace manualmente con la CLI de Vercel:
+El repo tiene remote en GitHub: `origin` → `https://github.com/emilycodesoft/recall-mcp`.
+El proyecto está enlazado a Vercel (`recall-mcp`, ver `packages/dashboard/.vercel/project.json`).
+
+Deploy manual con la CLI de Vercel:
 
 ```bash
 cd packages/dashboard
 vercel deploy --prod   # despliega a producción
 ```
+
+**Deploy automático (opcional):** conectar la integración de Git de Vercel
+(Settings → Git → Connect `emilycodesoft/recall-mcp`, Production Branch = `main`).
+Como es monorepo, fijar **Root Directory = `packages/dashboard`** en Settings → General.
+Con eso: push a `main` → producción; otras ramas/PRs → preview deployments.
 
 Variables de entorno necesarias:
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` — conexión a Supabase
