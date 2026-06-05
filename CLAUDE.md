@@ -66,11 +66,14 @@ El system prompt está en `packages/dashboard/SYSTEM_PROMPT.md`.
 El repo tiene remote en GitHub: `origin` → `https://github.com/emilycodesoft/recall-mcp`.
 El proyecto está enlazado a Vercel (`recall-mcp`, ver `packages/dashboard/.vercel/project.json`).
 
-Deploy manual con la CLI de Vercel:
+Deploy manual con la CLI de Vercel. **Lanzar desde la raíz del repo, NO desde
+`packages/dashboard`**: el proyecto en Vercel tiene Root Directory = `packages/dashboard`
+configurado del lado del servidor, así que correrlo desde dentro de ese dir duplica la
+ruta y falla.
 
 ```bash
-cd packages/dashboard
-vercel deploy --prod   # despliega a producción
+# desde la raíz del repo (recall-mcp/)
+vercel --prod --yes   # despliega a producción → alias https://recall-mcp.vercel.app
 ```
 
 **Deploy automático (opcional):** conectar la integración de Git de Vercel
