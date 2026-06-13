@@ -51,6 +51,9 @@ export default async function DashboardPage() {
           <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Historial →
           </Link>
+          <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+            Ajustes →
+          </Link>
         </div>
       </div>
 
