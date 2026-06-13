@@ -349,6 +349,22 @@ export async function filterTopics(
 // Keeps metrics reflecting current knowledge rather than accumulating indefinitely.
 const RECENT_WINDOW = 5;
 
+// Shape of the nested Supabase result for getReviewCandidates. Supabase types
+// embeds loosely (often as arrays), so we assert this via `unknown` at the cast.
+interface CandidateSubRow {
+  name: string;
+  recall_subsections: { recall_id: number; covered: boolean; score: number }[];
+  quick_review_answers: { session_id: number; score: number; question: string | null }[];
+}
+interface CandidateRow {
+  id: number;
+  name: string;
+  topic_groups: { name: string } | null;
+  recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[];
+  quick_review_sessions: { id: number; reviewed_at: string; overall_score: number }[];
+  topic_subsections: CandidateSubRow[];
+}
+
 export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase
     .from("topics")
@@ -379,7 +395,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as any[])
+  return ((data ?? []) as unknown as CandidateRow[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
       const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
@@ -467,7 +483,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
       const qrDateMap = new Map(qrs.map((q) => [q.id, q.reviewed_at]));
 
-      const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
+      const subsections = (t.topic_subsections ?? []).map((s) => {
         const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
         const qas: { session_id: number; score: number; question: string | null }[] = s.quick_review_answers ?? [];
 
