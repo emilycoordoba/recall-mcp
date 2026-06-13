@@ -184,13 +184,13 @@ export async function findTopics(query: string, userId: number) {
   const [{ data: topicData, error: te }, { data: subsData, error: se }] = await Promise.all([
     supabase
       .from("topics")
-      .select("id, name, group_id, topic_groups(name)")
+      .select("id, name, group_id, topic_groups!topics_group_id_fkey(name)")
       .eq("user_id", userId)
       .ilike("name", `%${query}%`)
       .order("name"),
     supabase
       .from("topic_subsections")
-      .select("name, topic_id, topics(id, name, group_id, topic_groups(name))")
+      .select("name, topic_id, topics(id, name, group_id, topic_groups!topics_group_id_fkey(name))")
       .eq("user_id", userId)
       .ilike("name", `%${query}%`),
   ]);
@@ -237,7 +237,7 @@ export async function findTopics(query: string, userId: number) {
 export async function getTopicByName(name: string, userId: number) {
   const { data, error } = await supabase
     .from("topics")
-    .select("id, name, group_id, topic_groups(name)")
+    .select("id, name, group_id, topic_groups!topics_group_id_fkey(name)")
     .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
@@ -295,7 +295,7 @@ export async function getTopicHistory(topicId: number, userId: number) {
 export async function listTopics(userId: number, groupName?: string) {
   let query = supabase
     .from("topics")
-    .select(`id, name, created_at, group_id, topic_groups(name), recalls(overall_score, recalled_at)`)
+    .select(`id, name, created_at, group_id, topic_groups!topics_group_id_fkey(name), recalls(overall_score, recalled_at)`)
     .eq("user_id", userId)
     .order("name");
 
@@ -370,7 +370,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
     .from("topics")
     .select(`
       id, name,
-      topic_groups(name),
+      topic_groups!topics_group_id_fkey(name),
       recalls(id, recalled_at, overall_score, format),
       quick_review_sessions(id, reviewed_at, overall_score),
       topic_subsections(
@@ -741,6 +741,74 @@ export async function updateTopicById(
   return { success: true, topic_id: id };
 }
 
+// ─── Grupos muchos-a-muchos (Track C, solo dashboard) ─────────────────────────
+//
+// `topic_group_links` es la fuente de verdad del conjunto de grupos. `topics.group_id`
+// se mantiene como el grupo "primario" (lo que siguen usando MCP/review/stats); el
+// invariante es que, si el topic tiene algún grupo, `group_id` apunta a uno de ellos.
+
+// Agrega (get-or-create) un grupo al topic. Si el topic no tenía primario, lo fija.
+export async function addTopicGroup(topicId: number, groupName: string, userId: number) {
+  const name = groupName.trim();
+  if (!name) return { success: false, error: "El nombre del grupo no puede estar vacío" };
+
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("id, group_id")
+    .eq("id", topicId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!topic) return { success: false, error: "Topic no encontrado" };
+
+  const groupId = await getOrCreateGroup(name, userId);
+
+  const { error: linkErr } = await supabase
+    .from("topic_group_links")
+    .upsert({ topic_id: topicId, group_id: groupId, user_id: userId }, { onConflict: "topic_id,group_id", ignoreDuplicates: true });
+  if (linkErr) return { success: false, error: linkErr.message };
+
+  // Si el topic no tenía grupo primario, este pasa a serlo.
+  if (topic.group_id === null) {
+    await supabase.from("topics").update({ group_id: groupId }).eq("id", topicId).eq("user_id", userId);
+  }
+
+  return { success: true, group: { id: groupId, name } };
+}
+
+// Quita un grupo del topic. Si era el primario, lo repunta a otro grupo restante (o null).
+export async function removeTopicGroup(topicId: number, groupId: number, userId: number) {
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("id, group_id")
+    .eq("id", topicId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!topic) return { success: false, error: "Topic no encontrado" };
+
+  const { error: delErr } = await supabase
+    .from("topic_group_links")
+    .delete()
+    .eq("topic_id", topicId)
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+  if (delErr) return { success: false, error: delErr.message };
+
+  // Mantener el invariante del primario.
+  if (topic.group_id === groupId) {
+    const { data: remaining } = await supabase
+      .from("topic_group_links")
+      .select("group_id")
+      .eq("topic_id", topicId)
+      .eq("user_id", userId)
+      .order("created_at")
+      .limit(1);
+    const newPrimary = remaining?.[0]?.group_id ?? null;
+    await supabase.from("topics").update({ group_id: newPrimary }).eq("id", topicId).eq("user_id", userId);
+  }
+
+  return { success: true };
+}
+
 export async function updateTopic(
   topicName: string,
   updates: { new_name?: string; group_name?: string | null },
@@ -1079,7 +1147,7 @@ export async function getStats(userId: number): Promise<Stats> {
     { data: recalls },
     { data: qrs },
   ] = await Promise.all([
-    supabase.from("topics").select("id, topic_groups(name)").eq("user_id", userId),
+    supabase.from("topics").select("id, topic_groups!topics_group_id_fkey(name)").eq("user_id", userId),
     supabase.from("recalls").select("topic_id, recalled_at, overall_score").eq("user_id", userId),
     supabase.from("quick_review_sessions").select("topic_id, reviewed_at").eq("user_id", userId),
   ]);
