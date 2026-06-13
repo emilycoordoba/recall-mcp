@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation"
 import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BackButton } from "@/components/back-button"
 import { TopicSessions } from "@/components/topic-sessions"
+import { TopicDetailHeader } from "@/components/topic-detail-header"
+import { SubsectionList } from "@/components/subsection-list"
 
 export const revalidate = 30
 
@@ -50,21 +51,11 @@ export default async function TopicPage({
     <div className="mx-auto max-w-4xl px-6 py-10">
       <BackButton />
 
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{topic.name}</h1>
-          {topic.group_name && (
-            <Badge variant="outline">{topic.group_name}</Badge>
-          )}
-        </div>
-        {topic.description && (
-          <p className="mt-2 text-sm text-muted-foreground">{topic.description}</p>
-        )}
-        <p className="mt-1 text-xs text-muted-foreground">
-          {recalls.length} recall{recalls.length !== 1 ? "s" : ""} · {quickReviews.length} quick review{quickReviews.length !== 1 ? "s" : ""}
-        </p>
-      </div>
+      <TopicDetailHeader
+        topic={{ id: topic.id, name: topic.name, description: topic.description, group_name: topic.group_name }}
+        recallCount={recalls.length}
+        quickReviewCount={quickReviews.length}
+      />
 
       {/* Subsections */}
       {subsections.length > 0 && (
@@ -73,26 +64,7 @@ export default async function TopicPage({
             <CardTitle className="text-sm font-medium">Subsections</CardTitle>
           </CardHeader>
           <CardContent>
-            <ol className="space-y-1">
-              {subsections.map((s, i) => (
-                <li key={s.id} className="flex items-center gap-2 text-sm">
-                  <span className="w-5 text-right font-mono text-xs text-muted-foreground">
-                    {i + 1}.
-                  </span>
-                  <span className="flex-1">{s.name}</span>
-                  {s.mastered ? (
-                    <span className="text-xs text-green-600 dark:text-green-400" title="Dominada">✓</span>
-                  ) : s.practice_count > 0 ? (
-                    <span className="text-xs text-amber-500" title="En progreso">○</span>
-                  ) : null}
-                  {s.practice_count > 0 && (
-                    <span className="font-mono text-xs text-muted-foreground">
-                      ×{s.practice_count}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
+            <SubsectionList subsections={subsections} />
           </CardContent>
         </Card>
       )}

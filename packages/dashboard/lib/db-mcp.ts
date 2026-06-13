@@ -656,6 +656,30 @@ export async function updateSubsectionName(topicName: string, oldName: string, n
   return { success: true, updated: { topic: topicName, old_name: oldName, new_name: newName } };
 }
 
+// By-id variant for the dashboard. Subsections have no user_id, so ownership is
+// verified by joining to the parent topic and checking its user_id.
+export async function updateSubsectionNameById(subsectionId: number, newName: string, userId: number) {
+  const trimmed = newName.trim();
+  if (!trimmed) return { success: false, error: "El nombre no puede estar vacío" };
+
+  const { data: sub } = await supabase
+    .from("topic_subsections")
+    .select("id, topics!inner(user_id)")
+    .eq("id", subsectionId)
+    .maybeSingle();
+
+  const owner = (sub?.topics as unknown as { user_id: number } | null)?.user_id;
+  if (!sub || owner !== userId) return { success: false, error: "Subsección no encontrada" };
+
+  const { error } = await supabase
+    .from("topic_subsections")
+    .update({ name: trimmed })
+    .eq("id", subsectionId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, subsection_id: subsectionId, new_name: trimmed };
+}
+
 export async function updateRecallFeedback(recallId: number, feedback: string, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
@@ -672,7 +696,7 @@ export async function updateRecallFeedback(recallId: number, feedback: string, u
 
 export async function updateTopicById(
   id: number,
-  updates: { name?: string },
+  updates: { name?: string; description?: string | null },
   userId: number,
 ) {
   const patch: Record<string, unknown> = {};
@@ -687,6 +711,11 @@ export async function updateTopicById(
       .maybeSingle();
     if (existing) return { success: false, error: `Ya existe un topic llamado "${updates.name}"` };
     patch.name = updates.name;
+  }
+
+  if (updates.description !== undefined) {
+    // Empty string → null so the column stays clean (no blank descriptions).
+    patch.description = updates.description?.trim() ? updates.description.trim() : null;
   }
 
   if (Object.keys(patch).length === 0) return { success: true, topic_id: id };
