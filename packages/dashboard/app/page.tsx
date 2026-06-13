@@ -6,9 +6,11 @@ import { DashboardFilters } from "@/components/dashboard-filters"
 function groupStats(topics: TopicRow[]) {
   const map = new Map<string, TopicRow[]>()
   for (const t of topics) {
-    if (!t.group_name) continue
-    if (!map.has(t.group_name)) map.set(t.group_name, [])
-    map.get(t.group_name)!.push(t)
+    // Un topic puede pertenecer a varios grupos: cuenta en cada uno.
+    for (const g of t.groups) {
+      if (!map.has(g.name)) map.set(g.name, [])
+      map.get(g.name)!.push(t)
+    }
   }
   return [...map.entries()]
     .map(([name, ts]) => {
@@ -27,7 +29,7 @@ function groupStats(topics: TopicRow[]) {
 export default async function DashboardPage() {
   const userId = await currentUserId()
   const [topics, streak] = await Promise.all([getTopics(userId), getStudyStreak(userId)])
-  const groups = Array.from(new Set(topics.map((t) => t.group_name).filter(Boolean))) as string[]
+  const groups = Array.from(new Set(topics.flatMap((t) => t.groups.map((g) => g.name)))).sort((a, b) => a.localeCompare(b))
   const stats = groupStats(topics)
 
   return (

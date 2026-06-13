@@ -269,7 +269,7 @@ export function DashboardFilters({ topics, groups }: Props) {
   }
 
   const filtered = localTopics
-    .filter((t) => group === "all" || t.group_name === group)
+    .filter((t) => group === "all" || t.groups.some((g) => g.name === group))
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       switch (sort) {
@@ -361,9 +361,15 @@ export function DashboardFilters({ topics, groups }: Props) {
                       <TopicNameCell topic={topic} onRename={handleRename} />
                     </TableCell>
                     <TableCell>
-                      {topic.group_name
-                        ? <Badge variant="outline">{topic.group_name}</Badge>
-                        : <span className="text-muted-foreground">—</span>}
+                      {topic.groups.length > 0 ? (
+                        <span className="flex flex-wrap gap-1">
+                          {topic.groups.map((g) => (
+                            <Badge key={g.id} variant="outline">{g.name}</Badge>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="inline-flex items-center gap-1">
