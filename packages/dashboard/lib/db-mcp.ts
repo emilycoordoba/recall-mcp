@@ -114,7 +114,13 @@ export async function getUserSettings(userId: number): Promise<UserSettings> {
     .select("settings")
     .eq("id", userId)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // 42703 = undefined_column: la migración que agrega users.settings aún no
+    // corrió. Caer a defaults mantiene el plan de repaso funcionando (deploy-safe
+    // si el código llega antes que la migración). Cualquier otro error sí se propaga.
+    if (error.code === "42703") return { ...DEFAULT_SETTINGS };
+    throw error;
+  }
   return { ...DEFAULT_SETTINGS, ...((data?.settings as Partial<UserSettings>) ?? {}) };
 }
 
