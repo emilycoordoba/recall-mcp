@@ -16,7 +16,13 @@ create table if not exists public.topic_group_links (
 create index if not exists topic_group_links_group_idx on public.topic_group_links(group_id);
 create index if not exists topic_group_links_user_idx  on public.topic_group_links(user_id);
 
--- Backfill desde la asignación 1-a-1 existente.
+-- El aislamiento es a nivel app (ver docs/multiuser.md); igual que el resto del
+-- esquema, esta tabla NO usa RLS. Si la tabla nació con RLS habilitado, el anon
+-- key (que usa la app) no podría ni leer ni escribir sus filas. Track D abordará
+-- RLS de forma integral para todas las tablas.
+alter table public.topic_group_links disable row level security;
+
+-- Backfill desde la asignación 1-a-1 existente (idempotente).
 insert into public.topic_group_links (topic_id, group_id, user_id)
 select id, group_id, user_id
 from public.topics

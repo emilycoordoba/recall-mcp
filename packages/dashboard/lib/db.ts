@@ -140,7 +140,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
     .from("topics")
     .select(`
       id, name, description, created_at, group_id,
-      topic_groups(name),
+      topic_groups!topics_group_id_fkey(name),
       recalls(overall_score, recalled_at, format),
       quick_review_sessions(reviewed_at, overall_score)
     `)
@@ -274,7 +274,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
 export async function getTopic(id: number, userId: number): Promise<TopicDetail | undefined> {
   const { data, error } = await supabase
     .from("topics")
-    .select("id, name, description, created_at, group_id, topic_groups(name)")
+    .select("id, name, description, created_at, group_id, topic_groups!topics_group_id_fkey(name)")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -474,7 +474,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
       .from("recalls")
       .select(`
         id, recalled_at, overall_score, feedback, topic_id,
-        topics(name, topic_groups(name)),
+        topics(name, topic_groups!topics_group_id_fkey(name)),
         recall_subsections(covered, score, topic_subsections(name, order_index))
       `)
       .eq("user_id", userId)
@@ -483,7 +483,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
       .from("quick_review_sessions")
       .select(`
         id, reviewed_at, overall_score, topic_id,
-        topics(name, topic_groups(name)),
+        topics(name, topic_groups!topics_group_id_fkey(name)),
         quick_review_answers(question, answer, score, feedback, topic_subsections(name))
       `)
       .eq("user_id", userId)

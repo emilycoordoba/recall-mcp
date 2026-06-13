@@ -184,13 +184,13 @@ export async function findTopics(query: string, userId: number) {
   const [{ data: topicData, error: te }, { data: subsData, error: se }] = await Promise.all([
     supabase
       .from("topics")
-      .select("id, name, group_id, topic_groups(name)")
+      .select("id, name, group_id, topic_groups!topics_group_id_fkey(name)")
       .eq("user_id", userId)
       .ilike("name", `%${query}%`)
       .order("name"),
     supabase
       .from("topic_subsections")
-      .select("name, topic_id, topics(id, name, group_id, topic_groups(name))")
+      .select("name, topic_id, topics(id, name, group_id, topic_groups!topics_group_id_fkey(name))")
       .eq("user_id", userId)
       .ilike("name", `%${query}%`),
   ]);
@@ -237,7 +237,7 @@ export async function findTopics(query: string, userId: number) {
 export async function getTopicByName(name: string, userId: number) {
   const { data, error } = await supabase
     .from("topics")
-    .select("id, name, group_id, topic_groups(name)")
+    .select("id, name, group_id, topic_groups!topics_group_id_fkey(name)")
     .eq("user_id", userId)
     .ilike("name", name)
     .maybeSingle();
@@ -295,7 +295,7 @@ export async function getTopicHistory(topicId: number, userId: number) {
 export async function listTopics(userId: number, groupName?: string) {
   let query = supabase
     .from("topics")
-    .select(`id, name, created_at, group_id, topic_groups(name), recalls(overall_score, recalled_at)`)
+    .select(`id, name, created_at, group_id, topic_groups!topics_group_id_fkey(name), recalls(overall_score, recalled_at)`)
     .eq("user_id", userId)
     .order("name");
 
@@ -370,7 +370,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
     .from("topics")
     .select(`
       id, name,
-      topic_groups(name),
+      topic_groups!topics_group_id_fkey(name),
       recalls(id, recalled_at, overall_score, format),
       quick_review_sessions(id, reviewed_at, overall_score),
       topic_subsections(
@@ -1147,7 +1147,7 @@ export async function getStats(userId: number): Promise<Stats> {
     { data: recalls },
     { data: qrs },
   ] = await Promise.all([
-    supabase.from("topics").select("id, topic_groups(name)").eq("user_id", userId),
+    supabase.from("topics").select("id, topic_groups!topics_group_id_fkey(name)").eq("user_id", userId),
     supabase.from("recalls").select("topic_id, recalled_at, overall_score").eq("user_id", userId),
     supabase.from("quick_review_sessions").select("topic_id, reviewed_at").eq("user_id", userId),
   ]);
