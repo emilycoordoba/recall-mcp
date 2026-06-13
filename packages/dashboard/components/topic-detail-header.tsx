@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,9 @@ export function TopicDetailHeader({
   const [editingDesc, setEditingDesc] = useState(false)
   const [busy, setBusy] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
+  // Guards against the double-commit that happens when pressing Enter unmounts
+  // (or disables) the focused field and the resulting blur re-fires the handler.
+  const committingRef = useRef(false)
 
   async function patch(body: Record<string, unknown>, onError: () => void) {
     setBusy(true)
@@ -48,17 +51,23 @@ export function TopicDetailHeader({
   }
 
   async function commitName() {
+    if (committingRef.current) return
     const trimmed = name.trim()
-    setEditingName(false)
-    if (!trimmed || trimmed === topic.name) { setName(topic.name); return }
+    if (!trimmed || trimmed === topic.name) { setName(topic.name); setEditingName(false); return }
+    committingRef.current = true
     await patch({ name: trimmed }, () => setName(topic.name))
+    committingRef.current = false
+    setEditingName(false)
   }
 
   async function commitDesc() {
+    if (committingRef.current) return
     const trimmed = description.trim()
-    setEditingDesc(false)
-    if (trimmed === (topic.description ?? "")) return
+    if (trimmed === (topic.description ?? "")) { setEditingDesc(false); return }
+    committingRef.current = true
     await patch({ description: trimmed || null }, () => setDescription(topic.description ?? ""))
+    committingRef.current = false
+    setEditingDesc(false)
   }
 
   async function remove() {
