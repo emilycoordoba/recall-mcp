@@ -7,7 +7,6 @@ Sistema de active recall personal. Claude Desktop explica temas, el usuario hace
 ```
 recall-mcp/
 ├── packages/
-│   ├── mcp-server/   — MCP server legacy (stdio + SQLite). YA NO SE USA.
 │   └── dashboard/    — Next.js: frontend + MCP server HTTP + Supabase
 ├── package.json      — workspace root (npm workspaces)
 └── CLAUDE.md
@@ -22,7 +21,6 @@ Claude Desktop ──HTTP──▶ Vercel (/api/mcp) ──▶ Supabase ◀─�
 - El MCP server vive en `packages/dashboard/pages/api/mcp.ts` (HTTP, Streamable MCP)
 - La lógica de tools está en `packages/dashboard/lib/mcp-server.ts`
 - Las queries a Supabase están en `packages/dashboard/lib/db-mcp.ts` (escritura) y `lib/db.ts` (lectura dashboard)
-- `packages/mcp-server/` es código legacy (stdio + SQLite), no se usa
 - **Multiusuario**: cada usuario se identifica por token (MCP) o Basic auth (dashboard) contra la tabla `users`; todos los datos se filtran por `user_id`. Ver `docs/multiuser.md`. Deuda: RLS deshabilitado, aislamiento solo a nivel app.
 
 ## Cómo funciona el sistema

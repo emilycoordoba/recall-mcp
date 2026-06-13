@@ -6,7 +6,6 @@
     "packages/*"
   ],
   "scripts": {
-    "build:mcp": "npm run build -w @recall/mcp-server",
     "build:dashboard": "npm run build -w @recall/dashboard",
     "dev:dashboard": "npm run dev -w @recall/dashboard",
     "start:dashboard": "npm run start -w @recall/dashboard"
