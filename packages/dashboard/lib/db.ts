@@ -214,7 +214,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       description: t.description,
       created_at: t.created_at,
       group_id: t.group_id,
-      group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
+      group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
       last_score,
       last_recalled_at: lastRecalledAt,
       total_recalls: recalls.length,
@@ -246,7 +246,7 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
     description: data.description,
     created_at: data.created_at,
     group_id: data.group_id,
-    group_name: (data.topic_groups as { name: string } | null)?.name ?? null,
+    group_name: (data.topic_groups as unknown as { name: string } | null)?.name ?? null,
   };
 }
 
@@ -317,7 +317,7 @@ export async function getRecallSubsections(recallId: number, userId: number): Pr
   return (data ?? []).map((row) => ({
     recall_id: row.recall_id,
     subsection_id: row.subsection_id,
-    subsection_name: (row.topic_subsections as { name: string } | null)?.name ?? "",
+    subsection_name: (row.topic_subsections as unknown as { name: string } | null)?.name ?? "",
     covered: row.covered,
     score: row.score,
   }));
@@ -515,7 +515,7 @@ export async function getQuickReviewAnswers(sessionId: number, userId: number): 
   return (data ?? []).map((row) => ({
     id: row.id,
     session_id: row.session_id,
-    subsection_name: (row.topic_subsections as { name: string } | null)?.name ?? null,
+    subsection_name: (row.topic_subsections as unknown as { name: string } | null)?.name ?? null,
     question: row.question,
     answer: row.answer,
     score: row.score,

@@ -96,7 +96,7 @@ export function createMcpServer(userId: number): McpServer {
 
   server.tool(
     "get_review_plan",
-    "Genera el plan de la sesión de repaso: 3 slots con topic, formato (quick / recall_dirigido) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso.",
+    "Genera el plan de la sesión de repaso: slots con topic, formato (quick / recall_dirigido / recall_completo) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso. El campo `new_topics` lista temas que el usuario aún no ha estrenado (0 sesiones) y que por preferencia NO entran al repaso espaciado: no los incluyas en la sesión salvo que el usuario pida explícitamente estrenarlos; puedes mencionarlos al final como temas pendientes por practicar.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
       const plan = await getReviewPlan(userId, group_name);

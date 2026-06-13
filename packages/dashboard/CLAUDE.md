@@ -48,9 +48,12 @@ components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table
 
 **Sorting del lado del servidor** — la página principal recibe `searchParams` y ordena en el Server Component. `DashboardFilters` solo actualiza los query params via router.
 
+**zod debe ir alineado con el del MCP SDK** — `lib/mcp-server.ts` pasa schemas de zod a `server.tool()` del `@modelcontextprotocol/sdk`. Si el dashboard resuelve una versión de zod (p.ej. v3) distinta a la que resuelve el SDK (v4), `tsc` intenta relacionar estructuralmente los `ZodType` de ambas versiones (tipos recursivos enormes) y **explota la memoria → OOM** (`structuredTypeRelatedTo`). Mantener `zod` en el rango que el SDK soporta (`^4`) y deduplicado a una sola versión. Síntoma: `npm run typecheck` se cuelga/crashea con "heap out of memory".
+
 ## Stack
 
 - Next.js 16 App Router + Turbopack
-- shadcn/ui + Tailwind CSS v4
-- better-sqlite3 (readonly)
+- shadcn/ui + Tailwind CSS v4 (Radix vía paquete unificado `radix-ui`)
+- Supabase (`@supabase/supabase-js`) — lectura (`lib/db.ts`) y escritura (`lib/db-mcp.ts`)
+- `@modelcontextprotocol/sdk` + zod v4 — MCP server HTTP
 - @tabler/icons-react

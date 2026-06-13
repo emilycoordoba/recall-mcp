@@ -62,6 +62,10 @@ export interface ReviewCandidate {
   avg_score: number | null;
   urgency: number;
   total_recalls: number;
+  // Recalls + quick reviews. total_recalls counts only full recalls, so a
+  // quick-review-only topic (e.g. math practice) has total_recalls 0 but
+  // total_sessions > 0 — this is the field that means "practiced at least once".
+  total_sessions: number;
   next_review_date: string | null;
   days_overdue: number;
   sm2_interval: number;
@@ -85,6 +89,55 @@ export async function getUserByToken(token: string): Promise<User | null> {
     .maybeSingle();
   if (error) throw error;
   return data ?? null;
+}
+
+// ─── User settings ────────────────────────────────────────────────────────────
+// Per-user preferences stored in users.settings (jsonb). New keys can be added
+// here without a migration; DEFAULT_SETTINGS fills any absent key so old rows
+// (settings = '{}') and partially-set rows behave predictably.
+
+export interface UserSettings {
+  // When true, topics with zero practice sessions are kept out of the spaced
+  // review plan and surfaced separately as "new topics to start". Defaults true:
+  // pushing a never-practiced topic into spaced repetition is what flooded the
+  // session with unfamiliar material.
+  review_only_practiced: boolean;
+}
+
+export const DEFAULT_SETTINGS: UserSettings = {
+  review_only_practiced: true,
+};
+
+export async function getUserSettings(userId: number): Promise<UserSettings> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("settings")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) {
+    // 42703 = undefined_column: la migración que agrega users.settings aún no
+    // corrió. Caer a defaults mantiene el plan de repaso funcionando (deploy-safe
+    // si el código llega antes que la migración). Cualquier otro error sí se propaga.
+    if (error.code === "42703") return { ...DEFAULT_SETTINGS };
+    throw error;
+  }
+  return { ...DEFAULT_SETTINGS, ...((data?.settings as Partial<UserSettings>) ?? {}) };
+}
+
+// Merges a partial patch over the stored settings and persists the result.
+// Returns the full, defaulted settings so callers can echo the new state.
+export async function updateUserSettings(
+  userId: number,
+  patch: Partial<UserSettings>,
+): Promise<UserSettings> {
+  const current = await getUserSettings(userId);
+  const next = { ...current, ...patch };
+  const { error } = await supabase
+    .from("users")
+    .update({ settings: next })
+    .eq("id", userId);
+  if (error) throw error;
+  return next;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -154,14 +207,14 @@ export async function findTopics(query: string, userId: number) {
     map.set(t.id, {
       id: t.id,
       name: t.name,
-      group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
+      group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
       match_type: "topic",
       matched_subsections: [],
     });
   }
 
   for (const s of subsData ?? []) {
-    const parent = s.topics as { id: number; name: string; group_id: number | null; topic_groups: { name: string } | null } | null;
+    const parent = s.topics as unknown as { id: number; name: string; group_id: number | null; topic_groups: { name: string } | null } | null;
     if (!parent) continue;
     const existing = map.get(parent.id);
     if (existing) {
@@ -171,7 +224,7 @@ export async function findTopics(query: string, userId: number) {
       map.set(parent.id, {
         id: parent.id,
         name: parent.name,
-        group_name: (parent.topic_groups as { name: string } | null)?.name ?? null,
+        group_name: (parent.topic_groups as unknown as { name: string } | null)?.name ?? null,
         match_type: "subsection",
         matched_subsections: [s.name],
       });
@@ -193,7 +246,7 @@ export async function getTopicByName(name: string, userId: number) {
   return {
     id: data.id,
     name: data.name,
-    group_name: (data.topic_groups as { name: string } | null)?.name ?? null,
+    group_name: (data.topic_groups as unknown as { name: string } | null)?.name ?? null,
   };
 }
 
@@ -229,7 +282,7 @@ export async function getTopicHistory(topicId: number, userId: number) {
         ...r,
         subsections: (subs ?? []).map((s) => ({
           ...s,
-          subsection_name: (s.topic_subsections as { name: string } | null)?.name ?? "",
+          subsection_name: (s.topic_subsections as unknown as { name: string } | null)?.name ?? "",
           topic_subsections: undefined,
         })),
       };
@@ -266,7 +319,7 @@ export async function listTopics(userId: number, groupName?: string) {
       id: t.id,
       name: t.name,
       created_at: t.created_at,
-      group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
+      group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
       last_score: sorted[0]?.overall_score ?? null,
       last_recall: sorted[0]?.recalled_at ?? null,
       total_recalls: recalls.length,
@@ -445,12 +498,13 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       return {
         topic_id: t.id,
         topic_name: t.name,
-        group_name: (t.topic_groups as { name: string } | null)?.name ?? null,
+        group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
         days_since_recall: daysSince,
         days_since_full_recall: daysSinceFullRecall,
         avg_score: avgScore !== null ? Math.round(avgScore * 100) / 100 : null,
         urgency: Math.round(urgency * 100) / 100,
         total_recalls: recalls.length,
+        total_sessions: recalls.length + qrs.length,
         next_review_date: nextReviewDate,
         days_overdue: daysOverdue,
         sm2_interval: sm2Interval,
@@ -764,8 +818,17 @@ export interface ReviewSlot {
 // 2 means: if a topic was slot 1 in either of the last 2 sessions, skip it.
 const SLOT1_COOLDOWN_SESSIONS = 2;
 
-export async function getReviewPlan(userId: number, groupName?: string): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string }> {
-  const [candidates, { data: recentSlotRows }] = await Promise.all([
+export interface NewTopic {
+  topic_id: number;
+  topic_name: string;
+  group_name: string | null;
+}
+
+export async function getReviewPlan(
+  userId: number,
+  groupName?: string,
+): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string; new_topics: NewTopic[] }> {
+  const [allCandidates, { data: recentSlotRows }, settings] = await Promise.all([
     getReviewCandidates(userId, groupName),
     supabase
       .from("review_session_slots")
@@ -773,9 +836,31 @@ export async function getReviewPlan(userId: number, groupName?: string): Promise
       .eq("user_id", userId)
       .order("id", { ascending: false })
       .limit(SLOT1_COOLDOWN_SESSIONS * 4 + 4), // enough rows to cover recent sessions
+    getUserSettings(userId),
   ]);
 
-  if (candidates.length === 0) return { slots: [], message: "No hay topics registrados para repasar." };
+  // Split off never-practiced topics so spaced repetition only schedules material
+  // the user has actually seen. They're returned in `new_topics` (not the plan)
+  // so Claude can offer to "estrenarlos" without polluting the review slots.
+  const newTopics: NewTopic[] = settings.review_only_practiced
+    ? allCandidates
+        .filter((c) => c.total_sessions === 0)
+        .map((c) => ({ topic_id: c.topic_id, topic_name: c.topic_name, group_name: c.group_name }))
+    : [];
+  const candidates = settings.review_only_practiced
+    ? allCandidates.filter((c) => c.total_sessions > 0)
+    : allCandidates;
+
+  if (allCandidates.length === 0) {
+    return { slots: [], new_topics: newTopics, message: "No hay topics registrados para repasar." };
+  }
+  if (candidates.length === 0) {
+    return {
+      slots: [],
+      new_topics: newTopics,
+      message: "Todos tus topics son nuevos: estrénalos con un primer recall o quick review antes de entrar al repaso espaciado.",
+    };
+  }
 
   // Topics that occupied slot 1 in the last SLOT1_COOLDOWN_SESSIONS sessions → cooldown
   const slot1Rows = (recentSlotRows ?? []).filter((r) => r.slot_number === 1);
@@ -940,7 +1025,7 @@ export async function getReviewPlan(userId: number, groupName?: string): Promise
     // Session persistence is best-effort — don't fail the plan if it errors
   }
 
-  return { slots, session_id };
+  return { slots, session_id, new_topics: newTopics };
 }
 
 export async function getStats(userId: number): Promise<Stats> {
@@ -1005,7 +1090,7 @@ export async function getStats(userId: number): Promise<Stats> {
   const groupCounts = new Map<string, number>();
   for (const r of (recalls ?? [])) {
     const topic = (topics ?? []).find((t) => t.id === r.topic_id);
-    const g = (topic?.topic_groups as { name: string } | null)?.name;
+    const g = (topic?.topic_groups as unknown as { name: string } | null)?.name;
     if (g) groupCounts.set(g, (groupCounts.get(g) ?? 0) + 1);
   }
   const mostActiveGroup = [...groupCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
