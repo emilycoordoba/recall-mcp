@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers } from "@/lib/db"
+import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers, getGroups } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BackButton } from "@/components/back-button"
@@ -19,11 +19,12 @@ export default async function TopicPage({
   if (isNaN(topicId)) notFound()
 
   const userId = await currentUserId()
-  const [topic, subsections, rawRecalls, rawQuickReviews] = await Promise.all([
+  const [topic, subsections, rawRecalls, rawQuickReviews, allGroups] = await Promise.all([
     getTopic(topicId, userId),
     getSubsectionStats(topicId, userId),
     getRecalls(topicId, userId),
     getQuickReviews(topicId, userId),
+    getGroups(userId),
   ])
   if (!topic) notFound()
 
@@ -52,7 +53,8 @@ export default async function TopicPage({
       <BackButton />
 
       <TopicDetailHeader
-        topic={{ id: topic.id, name: topic.name, description: topic.description, group_name: topic.group_name }}
+        topic={{ id: topic.id, name: topic.name, description: topic.description, groups: topic.groups }}
+        allGroups={allGroups}
         recallCount={recalls.length}
         quickReviewCount={quickReviews.length}
       />

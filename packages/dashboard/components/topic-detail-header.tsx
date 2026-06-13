@@ -2,23 +2,25 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { IconTrash } from "@tabler/icons-react"
+import { TopicGroups, type GroupRef } from "@/components/topic-groups"
 
 interface Topic {
   id: number
   name: string
   description: string | null
-  group_name: string | null
+  groups: GroupRef[]
 }
 
 export function TopicDetailHeader({
   topic,
+  allGroups,
   recallCount,
   quickReviewCount,
 }: {
   topic: Topic
+  allGroups: GroupRef[]
   recallCount: number
   quickReviewCount: number
 }) {
@@ -114,7 +116,6 @@ export function TopicDetailHeader({
               </span>
             </h1>
           )}
-          {topic.group_name && <Badge variant="outline">{topic.group_name}</Badge>}
         </div>
 
         <Button
@@ -128,6 +129,9 @@ export function TopicDetailHeader({
           Borrar
         </Button>
       </div>
+
+      {/* Grupos (muchos-a-muchos) */}
+      <TopicGroups topicId={topic.id} initialGroups={topic.groups} allGroups={allGroups} />
 
       {/* Description */}
       {editingDesc ? (
