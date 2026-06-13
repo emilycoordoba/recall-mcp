@@ -6,6 +6,41 @@ function localDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Mapa topic_id → grupos (muchos-a-muchos) para un conjunto de topics. Query
+// separada (no embed) y resiliente: si la tabla `topic_group_links` aún no existe
+// (migración no aplicada), devuelve un mapa vacío en vez de tumbar la lectura.
+async function groupsByTopic(topicIds: number[], userId: number): Promise<Map<number, GroupRef[]>> {
+  const map = new Map<number, GroupRef[]>();
+  if (topicIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from("topic_group_links")
+    .select("topic_id, topic_groups(id, name)")
+    .eq("user_id", userId)
+    .in("topic_id", topicIds);
+
+  if (error) {
+    // Tabla aún inexistente (migración pendiente): PostgREST devuelve PGRST205
+    // (tabla no encontrada) o PGRST200 (relación no encontrada); 42P01 es el de Postgres.
+    if (["PGRST205", "PGRST200", "42P01"].includes(error.code)) return map;
+    throw error;
+  }
+
+  for (const row of (data ?? []) as { topic_id: number; topic_groups: GroupRef | null }[]) {
+    if (!row.topic_groups) continue;
+    const list = map.get(row.topic_id) ?? [];
+    list.push(row.topic_groups);
+    map.set(row.topic_id, list);
+  }
+  for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+  return map;
+}
+
+export interface GroupRef {
+  id: number;
+  name: string;
+}
+
 export interface TopicRow {
   id: number;
   name: string;
@@ -13,6 +48,9 @@ export interface TopicRow {
   created_at: string;
   group_id: number | null;
   group_name: string | null;
+  // Conjunto completo de grupos (muchos-a-muchos). `group_name`/`group_id` son el
+  // grupo "primario"; `groups` los incluye a todos (para filtros/edición en el dashboard).
+  groups: GroupRef[];
   last_score: number | null;
   last_recalled_at: string | null;
   total_recalls: number;
@@ -32,6 +70,7 @@ export interface TopicDetail {
   created_at: string;
   group_id: number | null;
   group_name: string | null;
+  groups: GroupRef[];
 }
 
 export interface Subsection {
@@ -109,6 +148,8 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
     .order("name");
 
   if (error) throw error;
+
+  const groupsMap = await groupsByTopic((data ?? []).map((t) => t.id), userId);
 
   return (data ?? []).map((t) => {
     const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
@@ -215,6 +256,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       created_at: t.created_at,
       group_id: t.group_id,
       group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
+      groups: groupsMap.get(t.id) ?? [],
       last_score,
       last_recalled_at: lastRecalledAt,
       total_recalls: recalls.length,
@@ -240,6 +282,8 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
   if (error) throw error;
   if (!data) return undefined;
 
+  const groupsMap = await groupsByTopic([data.id], userId);
+
   return {
     id: data.id,
     name: data.name,
@@ -247,7 +291,19 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
     created_at: data.created_at,
     group_id: data.group_id,
     group_name: (data.topic_groups as unknown as { name: string } | null)?.name ?? null,
+    groups: groupsMap.get(data.id) ?? [],
   };
+}
+
+// Todos los grupos del usuario (para el selector de grupos del dashboard).
+export async function getGroups(userId: number): Promise<GroupRef[]> {
+  const { data, error } = await supabase
+    .from("topic_groups")
+    .select("id, name")
+    .eq("user_id", userId)
+    .order("name");
+  if (error) throw error;
+  return (data ?? []) as GroupRef[];
 }
 
 export async function getSubsections(topicId: number, userId: number): Promise<Subsection[]> {
