@@ -22,10 +22,12 @@ Desde la raíz del monorepo: `npm run dev:dashboard` / `npm run start:dashboard`
 | Ruta | Qué hace |
 |---|---|
 | `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover). |
-| `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
+| `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
 | `/settings` | Ajustes por usuario (p.ej. "repaso solo con temas estrenados"). |
 | `/api/topics/[id]` | `PATCH` (nombre/descripción) · `DELETE` (borrar topic) · `GET`. |
+| `/api/topics/[id]/groups` | `POST { name }` (agregar/crear grupo) · `DELETE ?groupId=` (quitar). |
 | `/api/topics/merge` | `POST { sourceId, targetId }` — fusiona el origen en el destino. |
+| `/api/groups` | `GET` — todos los grupos del usuario (selector). |
 | `/api/subsections/[id]` | `PATCH { name }` — renombra subsección. |
 | `/api/recalls/[id]` | `PATCH { feedback }` · `DELETE`. |
 | `/api/settings` | `GET` / `PATCH` ajustes del usuario actual. |
@@ -57,6 +59,10 @@ components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table
 **Dos libs de DB separadas por intención**: `lib/db.ts` es solo lectura (dashboard), `lib/db-mcp.ts` es escritura (MCP tools). Mantenerlas separadas evita exponer operaciones de escritura desde el frontend.
 
 **`/api/mcp` usa Pages API, no App Router** — el Streamable HTTP transport del MCP SDK necesita acceso al request/response crudos sin el body parser de Next.js. App Router no lo soporta bien.
+
+**Grupos muchos-a-muchos con "primario" (Track C)** — un topic puede tener varios grupos vía `topic_group_links`, pero `topics.group_id` se conserva como el grupo **primario** (lo que siguen usando las tools MCP, el plan de repaso y stats; la edición multi-grupo es solo del dashboard). Dos consecuencias:
+- **Embeds ambiguos**: al existir dos caminos FK entre `topics` y `topic_groups` (`group_id` directo y vía el join table), PostgREST falla con `PGRST201` en `topic_groups(...)`. Hay que nombrar la FK del primario: `topic_groups!topics_group_id_fkey(name)`. Los grupos completos se leen aparte (`groupsByTopic` en `lib/db.ts`), no por embed.
+- **RLS off**: `topic_group_links` debe tener RLS deshabilitado como el resto del esquema (aislamiento a nivel app). Si nace con RLS, el anon key no ve el backfill (lectura vacía silenciosa) ni puede escribir (`42501`).
 
 **Sorting del lado del servidor** — la página principal recibe `searchParams` y ordena en el Server Component. `DashboardFilters` solo actualiza los query params via router.
 
