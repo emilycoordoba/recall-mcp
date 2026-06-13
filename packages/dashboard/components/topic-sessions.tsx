@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
   Select,
@@ -18,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { IconCheck, IconX, IconBolt } from "@tabler/icons-react"
+import { IconCheck, IconX, IconBolt, IconTrash } from "@tabler/icons-react"
 
 function formatDate(iso: string) {
   const d = new Date(iso)
@@ -82,15 +84,123 @@ interface QuickSession {
 
 type Session = RecallSession | QuickSession
 
+// Inline-editable feedback for a recall. Click to edit, Esc to cancel, blur/save
+// to persist via PATCH /api/recalls/[id]. Shows an "add feedback" affordance when empty.
+function RecallFeedback({
+  recallId,
+  initial,
+  onSaved,
+}: {
+  recallId: number
+  initial: string | null
+  onSaved: (feedback: string | null) => void
+}) {
+  const router = useRouter()
+  const [value, setValue] = useState(initial ?? "")
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function commit() {
+    const trimmed = value.trim()
+    setEditing(false)
+    if (trimmed === (initial ?? "")) { setValue(initial ?? ""); return }
+    setBusy(true)
+    const res = await fetch(`/api/recalls/${recallId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ feedback: trimmed }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      setValue(initial ?? "")
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "No se pudo guardar el feedback")
+    } else {
+      onSaved(trimmed || null)
+      router.refresh()
+    }
+  }
+
+  if (editing) {
+    return (
+      <div>
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Feedback</p>
+        <textarea
+          value={value}
+          disabled={busy}
+          autoFocus
+          rows={3}
+          placeholder="Feedback de este recall…"
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { setValue(initial ?? ""); setEditing(false) }
+          }}
+          className="w-full rounded-md border border-ring bg-background px-4 py-3 text-sm leading-relaxed outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+        />
+      </div>
+    )
+  }
+
+  if (!value) {
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+      >
+        + Agregar feedback
+      </button>
+    )
+  }
+
+  return (
+    <div className="group">
+      <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Feedback
+        <button
+          onClick={() => setEditing(true)}
+          title="Editar feedback"
+          className="text-xs leading-none opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
+        >
+          ✎
+        </button>
+      </p>
+      <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-4 py-3 text-sm leading-relaxed">{value}</p>
+    </div>
+  )
+}
+
 interface Props {
   sessions: Session[]
   subsections: { id: number; name: string }[]
 }
 
 export function TopicSessions({ sessions, subsections }: Props) {
+  const router = useRouter()
   const [filter, setFilter] = useState<string>("all")
+  const [localSessions, setLocalSessions] = useState(sessions)
 
-  const filtered = filter === "all" ? sessions : sessions.filter((s) => {
+  async function handleDeleteRecall(id: number) {
+    if (!confirm("¿Borrar este recall? Esta acción no se puede deshacer.")) return
+    const prev = localSessions
+    setLocalSessions((ss) => ss.filter((s) => !(s.type === "recall" && s.data.id === id))) // optimistic
+    const res = await fetch(`/api/recalls/${id}`, { method: "DELETE" })
+    if (!res.ok) {
+      setLocalSessions(prev) // rollback
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "No se pudo borrar el recall")
+    } else {
+      router.refresh()
+    }
+  }
+
+  function applyFeedback(id: number, feedback: string | null) {
+    setLocalSessions((ss) =>
+      ss.map((s) => (s.type === "recall" && s.data.id === id ? { ...s, data: { ...s.data, feedback } } : s)),
+    )
+  }
+
+  const filtered = filter === "all" ? localSessions : localSessions.filter((s) => {
     if (s.type === "recall") {
       return s.data.subsections.some((sub) => sub.subsection_name === filter)
     }
@@ -133,7 +243,18 @@ export function TopicSessions({ sessions, subsections }: Props) {
                       <span className="text-xs text-muted-foreground">{formatDate(session.date)}</span>
                       <Badge variant="outline" className="text-xs">Full recall</Badge>
                     </div>
-                    <ScoreBadge score={session.data.overall_score} />
+                    <div className="flex items-center gap-1.5">
+                      <ScoreBadge score={session.data.overall_score} />
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        title="Borrar recall"
+                        onClick={() => handleDeleteRecall(session.data.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <IconTrash className="size-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -177,14 +298,11 @@ export function TopicSessions({ sessions, subsections }: Props) {
                       </p>
                     </div>
                   )}
-                  {session.data.feedback && (
-                    <div>
-                      <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Feedback</p>
-                      <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-4 py-3 text-sm leading-relaxed">
-                        {session.data.feedback}
-                      </p>
-                    </div>
-                  )}
+                  <RecallFeedback
+                    recallId={session.data.id}
+                    initial={session.data.feedback}
+                    onSaved={(fb) => applyFeedback(session.data.id, fb)}
+                  />
                 </CardContent>
               </Card>
             ) : (

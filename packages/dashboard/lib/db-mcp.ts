@@ -349,6 +349,22 @@ export async function filterTopics(
 // Keeps metrics reflecting current knowledge rather than accumulating indefinitely.
 const RECENT_WINDOW = 5;
 
+// Shape of the nested Supabase result for getReviewCandidates. Supabase types
+// embeds loosely (often as arrays), so we assert this via `unknown` at the cast.
+interface CandidateSubRow {
+  name: string;
+  recall_subsections: { recall_id: number; covered: boolean; score: number }[];
+  quick_review_answers: { session_id: number; score: number; question: string | null }[];
+}
+interface CandidateRow {
+  id: number;
+  name: string;
+  topic_groups: { name: string } | null;
+  recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[];
+  quick_review_sessions: { id: number; reviewed_at: string; overall_score: number }[];
+  topic_subsections: CandidateSubRow[];
+}
+
 export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase
     .from("topics")
@@ -379,7 +395,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as any[])
+  return ((data ?? []) as unknown as CandidateRow[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
       const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
@@ -467,7 +483,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       const recallDateMap = new Map(recalls.map((r) => [r.id, r.recalled_at]));
       const qrDateMap = new Map(qrs.map((q) => [q.id, q.reviewed_at]));
 
-      const subsections = ((t.topic_subsections ?? []) as any[]).map((s) => {
+      const subsections = (t.topic_subsections ?? []).map((s) => {
         const rs: { recall_id: number; covered: boolean; score: number }[] = s.recall_subsections ?? [];
         const qas: { session_id: number; score: number; question: string | null }[] = s.quick_review_answers ?? [];
 
@@ -656,6 +672,30 @@ export async function updateSubsectionName(topicName: string, oldName: string, n
   return { success: true, updated: { topic: topicName, old_name: oldName, new_name: newName } };
 }
 
+// By-id variant for the dashboard. Subsections have no user_id, so ownership is
+// verified by joining to the parent topic and checking its user_id.
+export async function updateSubsectionNameById(subsectionId: number, newName: string, userId: number) {
+  const trimmed = newName.trim();
+  if (!trimmed) return { success: false, error: "El nombre no puede estar vacío" };
+
+  const { data: sub } = await supabase
+    .from("topic_subsections")
+    .select("id, topics!inner(user_id)")
+    .eq("id", subsectionId)
+    .maybeSingle();
+
+  const owner = (sub?.topics as unknown as { user_id: number } | null)?.user_id;
+  if (!sub || owner !== userId) return { success: false, error: "Subsección no encontrada" };
+
+  const { error } = await supabase
+    .from("topic_subsections")
+    .update({ name: trimmed })
+    .eq("id", subsectionId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, subsection_id: subsectionId, new_name: trimmed };
+}
+
 export async function updateRecallFeedback(recallId: number, feedback: string, userId: number) {
   const { data, error } = await supabase
     .from("recalls")
@@ -672,7 +712,7 @@ export async function updateRecallFeedback(recallId: number, feedback: string, u
 
 export async function updateTopicById(
   id: number,
-  updates: { name?: string },
+  updates: { name?: string; description?: string | null },
   userId: number,
 ) {
   const patch: Record<string, unknown> = {};
@@ -687,6 +727,11 @@ export async function updateTopicById(
       .maybeSingle();
     if (existing) return { success: false, error: `Ya existe un topic llamado "${updates.name}"` };
     patch.name = updates.name;
+  }
+
+  if (updates.description !== undefined) {
+    // Empty string → null so the column stays clean (no blank descriptions).
+    patch.description = updates.description?.trim() ? updates.description.trim() : null;
   }
 
   if (Object.keys(patch).length === 0) return { success: true, topic_id: id };

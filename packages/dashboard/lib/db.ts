@@ -268,6 +268,56 @@ export interface SubsectionStat extends Subsection {
   mastered: boolean;
 }
 
+// Nested Supabase row shapes (asserted via `unknown` since Supabase types embeds
+// loosely, often as arrays where the relation is to-one).
+interface SubStatRow {
+  id: number;
+  topic_id: number;
+  name: string;
+  order_index: number;
+  recall_subsections: { recall_id: number; covered: boolean; score: number | null }[];
+  quick_review_answers: { score: number | null }[];
+}
+
+interface HistoryRecallRow {
+  id: number;
+  recalled_at: string;
+  topic_id: number;
+  overall_score: number;
+  feedback: string | null;
+  topics: { name: string; topic_groups: { name: string } | null } | null;
+  recall_subsections: { covered: boolean; score: number; topic_subsections: { name: string } | null }[];
+}
+
+interface HistoryQrRow {
+  id: number;
+  reviewed_at: string;
+  topic_id: number;
+  overall_score: number;
+  topics: { name: string; topic_groups: { name: string } | null } | null;
+  quick_review_answers: {
+    question: string;
+    answer: string | null;
+    score: number;
+    feedback: string | null;
+    topic_subsections: { name: string } | null;
+  }[];
+}
+
+interface SessionRow {
+  id: number;
+  started_at: string;
+  group_name: string | null;
+  recalls: { id: number; topic_id: number; overall_score: number | null }[];
+  quick_review_sessions: { id: number; topic_id: number; overall_score: number | null }[];
+  review_session_slots: {
+    slot_number: number;
+    format: string;
+    subsection_names: string[] | null;
+    topics: { id: number; name: string } | null;
+  }[];
+}
+
 export async function getSubsectionStats(topicId: number, userId: number): Promise<SubsectionStat[]> {
   const { data, error } = await supabase
     .from("topic_subsections")
@@ -278,12 +328,12 @@ export async function getSubsectionStats(topicId: number, userId: number): Promi
 
   if (error) throw error;
 
-  return ((data ?? []) as any[]).map((s) => {
-    const recallScores: number[] = (s.recall_subsections ?? []).map((r: any) => r.score).filter((v: any) => v !== null);
-    const qrScores: number[] = (s.quick_review_answers ?? []).map((q: any) => q.score).filter((v: any) => v !== null);
+  return ((data ?? []) as unknown as SubStatRow[]).map((s) => {
+    const recallScores: number[] = (s.recall_subsections ?? []).map((r) => r.score).filter((v): v is number => v !== null);
+    const qrScores: number[] = (s.quick_review_answers ?? []).map((q) => q.score).filter((v): v is number => v !== null);
     const allScores = [...recallScores, ...qrScores];
-    const recentRs = ([...(s.recall_subsections ?? [])] as any[]).sort((a, b) => b.recall_id - a.recall_id).slice(0, RECENT_WINDOW);
-    const recallMisses: number = recentRs.filter((r: any) => !r.covered).length;
+    const recentRs = [...(s.recall_subsections ?? [])].sort((a, b) => b.recall_id - a.recall_id).slice(0, RECENT_WINDOW);
+    const recallMisses: number = recentRs.filter((r) => !r.covered).length;
     const practice_count = allScores.length;
     const avg_score = allScores.length ? allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length : null;
     const mastered = practice_count >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && recallMisses === 0;
@@ -387,7 +437,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
   if (re) throw re;
   if (qe) throw qe;
 
-  const recallEntries: HistoryEntry[] = ((recalls ?? []) as any[]).map((r) => ({
+  const recallEntries: HistoryEntry[] = ((recalls ?? []) as unknown as HistoryRecallRow[]).map((r) => ({
     id: r.id,
     type: "recall" as const,
     date: r.recalled_at,
@@ -396,7 +446,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
     group_name: r.topics?.topic_groups?.name ?? null,
     score: r.overall_score,
     feedback: r.feedback ?? null,
-    subsections: (r.recall_subsections ?? []).map((s: any) => ({
+    subsections: (r.recall_subsections ?? []).map((s) => ({
       name: s.topic_subsections?.name ?? "?",
       covered: Boolean(s.covered),
       score: s.score,
@@ -404,7 +454,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
     answers: [],
   }));
 
-  const qrEntries: HistoryEntry[] = ((qrs ?? []) as any[]).map((q) => ({
+  const qrEntries: HistoryEntry[] = ((qrs ?? []) as unknown as HistoryQrRow[]).map((q) => ({
     id: q.id,
     type: "quick_review" as const,
     date: q.reviewed_at,
@@ -414,7 +464,7 @@ export async function getHistory(userId: number): Promise<HistoryEntry[]> {
     score: q.overall_score,
     feedback: null,
     subsections: [],
-    answers: (q.quick_review_answers ?? []).map((a: any) => ({
+    answers: (q.quick_review_answers ?? []).map((a) => ({
       subsection_name: a.topic_subsections?.name ?? null,
       question: a.question,
       answer: a.answer ?? null,
@@ -459,18 +509,18 @@ export async function getReviewSessions(userId: number): Promise<ReviewSessionEn
 
   if (error) throw error;
 
-  return ((data ?? []) as any[]).map((session) => {
-    const recalls: { id: number; topic_id: number; overall_score: number | null }[] = session.recalls ?? [];
-    const qrs: { id: number; topic_id: number; overall_score: number | null }[] = session.quick_review_sessions ?? [];
+  return ((data ?? []) as unknown as SessionRow[]).map((session) => {
+    const recalls = session.recalls ?? [];
+    const qrs = session.quick_review_sessions ?? [];
 
     const recallByTopic = new Map(recalls.map((r) => [r.topic_id, r]));
     const qrByTopic = new Map(qrs.map((q) => [q.topic_id, q]));
 
-    const slots: ReviewSessionSlot[] = ((session.review_session_slots ?? []) as any[])
-      .sort((a: any, b: any) => a.slot_number - b.slot_number)
-      .map((slot: any) => {
-        const topicId = (slot.topics as { id: number; name: string } | null)?.id ?? 0;
-        const topicName = (slot.topics as { id: number; name: string } | null)?.name ?? "?";
+    const slots: ReviewSessionSlot[] = (session.review_session_slots ?? [])
+      .sort((a, b) => a.slot_number - b.slot_number)
+      .map((slot) => {
+        const topicId = slot.topics?.id ?? 0;
+        const topicName = slot.topics?.name ?? "?";
         const format = slot.format as ReviewSessionSlot["format"];
 
         const recall = recallByTopic.get(topicId);
