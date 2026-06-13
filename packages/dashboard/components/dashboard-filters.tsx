@@ -3,7 +3,9 @@
 import Link from "next/link"
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { IconTrash, IconArrowMerge, IconX } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -134,6 +136,72 @@ function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: nu
   )
 }
 
+function RowActions({
+  topic,
+  targets,
+  onMerge,
+  onDelete,
+}: {
+  topic: TopicRow
+  targets: TopicRow[]
+  onMerge: (sourceId: number, targetId: number) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+}) {
+  const [merging, setMerging] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  async function pickTarget(targetId: string) {
+    const target = targets.find((t) => String(t.id) === targetId)
+    if (!target) return
+    if (!confirm(`¿Fusionar "${topic.name}" dentro de "${target.name}"? Sus recalls y subsecciones se moverán y "${topic.name}" se eliminará.`)) return
+    setBusy(true)
+    await onMerge(topic.id, target.id)
+    setBusy(false)
+    setMerging(false)
+  }
+
+  async function remove() {
+    if (!confirm(`¿Borrar "${topic.name}" y todo su historial? Esta acción no se puede deshacer.`)) return
+    setBusy(true)
+    await onDelete(topic.id)
+    // Component unmounts on success; resetting busy only matters if it failed.
+    setBusy(false)
+  }
+
+  if (merging) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <Select disabled={busy || targets.length === 0} onValueChange={pickTarget}>
+          <SelectTrigger className="h-7 w-44 px-2 py-1 text-xs">
+            <SelectValue placeholder={targets.length ? "Fusionar con…" : "Sin destinos"} />
+          </SelectTrigger>
+          <SelectContent>
+            {targets.map((t) => (
+              <SelectItem key={t.id} value={String(t.id)} className="text-xs">
+                {t.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="ghost" size="icon" className="size-7" disabled={busy} title="Cancelar" onClick={() => setMerging(false)}>
+          <IconX className="size-3.5" />
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title="Fusionar con otro topic" onClick={() => setMerging(true)}>
+        <IconArrowMerge className="size-3.5" />
+      </Button>
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title="Borrar topic" onClick={remove}>
+        <IconTrash className="size-3.5" />
+      </Button>
+    </div>
+  )
+}
+
 interface Props {
   topics: TopicRow[]
   groups: string[]
@@ -165,6 +233,36 @@ export function DashboardFilters({ topics, groups }: Props) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
       alert(data.error ?? "Error al renombrar")
+    } else {
+      router.refresh()
+    }
+  }
+
+  async function handleDelete(id: number) {
+    const prev = localTopics
+    setLocalTopics((ts) => ts.filter((t) => t.id !== id))
+    const res = await fetch(`/api/topics/${id}`, { method: "DELETE" })
+    if (!res.ok) {
+      setLocalTopics(prev)
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "Error al borrar")
+    } else {
+      router.refresh()
+    }
+  }
+
+  async function handleMerge(sourceId: number, targetId: number) {
+    const prev = localTopics
+    setLocalTopics((ts) => ts.filter((t) => t.id !== sourceId))
+    const res = await fetch(`/api/topics/merge`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceId, targetId }),
+    })
+    if (!res.ok) {
+      setLocalTopics(prev)
+      const data = await res.json().catch(() => ({}))
+      alert(data.error ?? "Error al fusionar")
     } else {
       router.refresh()
     }
@@ -246,18 +344,19 @@ export function DashboardFilters({ topics, groups }: Props) {
               <TableHead>Last Recall</TableHead>
               <TableHead className="text-right">Recalls</TableHead>
               <TableHead className="text-right">Próxima</TableHead>
+              <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
                   No topics found
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((topic) => (
-                  <TableRow key={topic.id}>
+                  <TableRow key={topic.id} className="group/row">
                     <TableCell>
                       <TopicNameCell topic={topic} onRename={handleRename} />
                     </TableCell>
@@ -280,6 +379,14 @@ export function DashboardFilters({ topics, groups }: Props) {
                     </TableCell>
                     <TableCell className="text-right">
                       <NextReviewCell daysOverdue={topic.days_overdue} dimmed={topic.total_recalls < 2} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowActions
+                        topic={topic}
+                        targets={localTopics.filter((t) => t.id !== topic.id)}
+                        onMerge={handleMerge}
+                        onDelete={handleDelete}
+                      />
                     </TableCell>
                   </TableRow>
                 ))
