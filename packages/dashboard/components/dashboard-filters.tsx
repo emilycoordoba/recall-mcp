@@ -436,7 +436,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
       <div className="flex flex-wrap gap-3">
         <input
           type="search"
-          placeholder="Buscar topic…"
+          placeholder="Buscar tema…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-7 w-48 rounded-md border border-input bg-input/20 px-2 py-1.5 text-xs placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
@@ -444,10 +444,10 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
 
         <Select value={group} onValueChange={(v) => { setGroup(v); localStorage.setItem("dashboard-group", v) }}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="All groups" />
+            <SelectValue placeholder="Todos los grupos" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All groups</SelectItem>
+            <SelectItem value="all">Todos los grupos</SelectItem>
             {groups.map((g) => (
               <SelectItem key={g} value={g}>{g}</SelectItem>
             ))}
@@ -456,22 +456,22 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
 
         <Select value={sort} onValueChange={(v) => { const k = v as SortKey; setSort(k); localStorage.setItem("dashboard-sort", k) }}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Sort by name" />
+            <SelectValue placeholder="Ordenar" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="name">Sort: Name</SelectItem>
-            <SelectItem value="score_desc">Sort: Score ↓</SelectItem>
-            <SelectItem value="score_asc">Sort: Score ↑</SelectItem>
-            <SelectItem value="date_desc">Sort: Date ↓</SelectItem>
-            <SelectItem value="date_asc">Sort: Date ↑</SelectItem>
-            <SelectItem value="days_desc">Sort: Días ↓</SelectItem>
-            <SelectItem value="days_asc">Sort: Días ↑</SelectItem>
-            <SelectItem value="recalls_desc">Sort: Recalls ↓</SelectItem>
-            <SelectItem value="recalls_asc">Sort: Recalls ↑</SelectItem>
-            <SelectItem value="urgency_desc">Sort: Urgencia ↓</SelectItem>
-            <SelectItem value="urgency_asc">Sort: Urgencia ↑</SelectItem>
-            <SelectItem value="overdue_desc">Sort: Próxima ↓</SelectItem>
-            <SelectItem value="overdue_asc">Sort: Próxima ↑</SelectItem>
+            <SelectItem value="name">Orden: Nombre</SelectItem>
+            <SelectItem value="score_desc">Orden: Puntaje ↓</SelectItem>
+            <SelectItem value="score_asc">Orden: Puntaje ↑</SelectItem>
+            <SelectItem value="date_desc">Orden: Fecha ↓</SelectItem>
+            <SelectItem value="date_asc">Orden: Fecha ↑</SelectItem>
+            <SelectItem value="days_desc">Orden: Días ↓</SelectItem>
+            <SelectItem value="days_asc">Orden: Días ↑</SelectItem>
+            <SelectItem value="recalls_desc">Orden: Recalls ↓</SelectItem>
+            <SelectItem value="recalls_asc">Orden: Recalls ↑</SelectItem>
+            <SelectItem value="urgency_desc">Orden: Urgencia ↓</SelectItem>
+            <SelectItem value="urgency_asc">Orden: Urgencia ↑</SelectItem>
+            <SelectItem value="overdue_desc">Orden: Próxima ↓</SelectItem>
+            <SelectItem value="overdue_asc">Orden: Próxima ↑</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -536,10 +536,10 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
                   onChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Topic</TableHead>
-              <TableHead>Group</TableHead>
-              <TableHead className="text-center">Last Score</TableHead>
-              <TableHead>Last Recall</TableHead>
+              <TableHead>Tema</TableHead>
+              <TableHead>Grupo</TableHead>
+              <TableHead className="text-center">Último puntaje</TableHead>
+              <TableHead>Último recall</TableHead>
               <TableHead className="text-right">Recalls</TableHead>
               <TableHead className="text-right">Próxima</TableHead>
               <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
@@ -549,7 +549,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                  No topics found
+                  No se encontraron temas
                 </TableCell>
               </TableRow>
             ) : (

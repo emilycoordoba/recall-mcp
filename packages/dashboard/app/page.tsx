@@ -3,6 +3,7 @@ import { getTopics, getStudyStreak, getGroups, type TopicRow } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
 import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
+import { Logo } from "@/components/logo"
 
 function groupStats(topics: TopicRow[]): GroupStat[] {
   // Agrupa por id (no por nombre) para poder borrar el grupo desde la tarjeta.
@@ -41,29 +42,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Recall Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {topics.length} topics · {groups.length} groups
+          <Logo />
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {topics.length} {topics.length === 1 ? "tema" : "temas"} · {groups.length} {groups.length === 1 ? "grupo" : "grupos"}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <nav className="flex items-center gap-4">
           {streak > 0 && (
             <span className="text-sm font-medium text-orange-500">
               🔥 {streak} {streak === 1 ? "día" : "días"}
             </span>
           )}
           <Link href="/sessions" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Sesiones →
+            Sesiones
           </Link>
           <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Historial →
+            Historial
           </Link>
           <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Ajustes →
+            Ajustes
           </Link>
-        </div>
+        </nav>
       </div>
 
       <GroupStatCards stats={stats} />
