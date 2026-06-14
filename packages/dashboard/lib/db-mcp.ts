@@ -809,6 +809,46 @@ export async function removeTopicGroup(topicId: number, groupId: number, userId:
   return { success: true };
 }
 
+// Borra un grupo entero (no sus topics). Quita sus enlaces y repunta el grupo
+// primario de los topics afectados a otro de sus grupos restantes (o null).
+export async function deleteGroup(groupId: number, userId: number) {
+  const { data: group } = await supabase
+    .from("topic_groups")
+    .select("id, name")
+    .eq("id", groupId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!group) return { success: false, error: "Grupo no encontrado" };
+
+  // Quitar los enlaces de este grupo (antes de repuntar, para que "restantes" lo excluya).
+  await supabase.from("topic_group_links").delete().eq("group_id", groupId).eq("user_id", userId);
+
+  // Repuntar el primario de los topics que tenían este grupo como primario.
+  const { data: affected } = await supabase
+    .from("topics")
+    .select("id")
+    .eq("group_id", groupId)
+    .eq("user_id", userId);
+  for (const t of affected ?? []) {
+    const { data: rem } = await supabase
+      .from("topic_group_links")
+      .select("group_id")
+      .eq("topic_id", t.id)
+      .eq("user_id", userId)
+      .order("created_at")
+      .limit(1);
+    await supabase
+      .from("topics")
+      .update({ group_id: rem?.[0]?.group_id ?? null })
+      .eq("id", t.id)
+      .eq("user_id", userId);
+  }
+
+  const { error } = await supabase.from("topic_groups").delete().eq("id", groupId).eq("user_id", userId);
+  if (error) return { success: false, error: error.message };
+  return { success: true, deleted_group: group.name };
+}
+
 export async function updateTopic(
   topicName: string,
   updates: { new_name?: string; group_name?: string | null },

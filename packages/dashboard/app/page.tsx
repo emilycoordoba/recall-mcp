@@ -1,22 +1,25 @@
 import Link from "next/link"
-import { getTopics, getStudyStreak, type TopicRow } from "@/lib/db"
+import { getTopics, getStudyStreak, getGroups, type TopicRow } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
+import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
 
-function groupStats(topics: TopicRow[]) {
-  const map = new Map<string, TopicRow[]>()
+function groupStats(topics: TopicRow[]): GroupStat[] {
+  // Agrupa por id (no por nombre) para poder borrar el grupo desde la tarjeta.
+  const map = new Map<number, { name: string; topics: TopicRow[] }>()
   for (const t of topics) {
     // Un topic puede pertenecer a varios grupos: cuenta en cada uno.
     for (const g of t.groups) {
-      if (!map.has(g.name)) map.set(g.name, [])
-      map.get(g.name)!.push(t)
+      if (!map.has(g.id)) map.set(g.id, { name: g.name, topics: [] })
+      map.get(g.id)!.topics.push(t)
     }
   }
   return [...map.entries()]
-    .map(([name, ts]) => {
+    .map(([id, { name, topics: ts }]) => {
       const scored = ts.filter((t) => t.last_score !== null)
       const avg = scored.length ? scored.reduce((s, t) => s + t.last_score!, 0) / scored.length : null
       return {
+        id,
         name,
         count: ts.length,
         avg_score: avg !== null ? Math.round(avg * 100) / 100 : null,
@@ -28,7 +31,11 @@ function groupStats(topics: TopicRow[]) {
 
 export default async function DashboardPage() {
   const userId = await currentUserId()
-  const [topics, streak] = await Promise.all([getTopics(userId), getStudyStreak(userId)])
+  const [topics, streak, allGroups] = await Promise.all([
+    getTopics(userId),
+    getStudyStreak(userId),
+    getGroups(userId),
+  ])
   const groups = Array.from(new Set(topics.flatMap((t) => t.groups.map((g) => g.name)))).sort((a, b) => a.localeCompare(b))
   const stats = groupStats(topics)
 
@@ -59,24 +66,9 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {stats.length > 0 && (
-        <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {stats.map((g) => (
-            <div key={g.name} className="rounded-lg border bg-card p-3">
-              <p className="truncate text-xs font-medium text-muted-foreground">{g.name}</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums">
-                {g.avg_score?.toFixed(1) ?? "—"}
-              </p>
-              <p className="text-xs text-muted-foreground">{g.count} topic{g.count !== 1 ? "s" : ""}</p>
-              {g.below3 > 0 && (
-                <p className="text-xs text-destructive">{g.below3} bajo 3.0</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <GroupStatCards stats={stats} />
 
-      <DashboardFilters topics={topics} groups={groups} />
+      <DashboardFilters topics={topics} groups={groups} allGroups={allGroups} />
     </div>
   )
 }

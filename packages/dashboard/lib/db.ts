@@ -26,10 +26,13 @@ async function groupsByTopic(topicIds: number[], userId: number): Promise<Map<nu
     throw error;
   }
 
-  for (const row of (data ?? []) as { topic_id: number; topic_groups: GroupRef | null }[]) {
-    if (!row.topic_groups) continue;
+  // PostgREST infiere el embed como array aunque la FK sea to-one; normalizamos
+  // a un único grupo aceptando ambas formas (objeto o array de un elemento).
+  for (const row of (data ?? []) as { topic_id: number; topic_groups: GroupRef | GroupRef[] | null }[]) {
+    const tg = Array.isArray(row.topic_groups) ? row.topic_groups[0] : row.topic_groups;
+    if (!tg) continue;
     const list = map.get(row.topic_id) ?? [];
-    list.push(row.topic_groups);
+    list.push(tg);
     map.set(row.topic_id, list);
   }
   for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));

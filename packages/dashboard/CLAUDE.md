@@ -21,13 +21,14 @@ Desde la raíz del monorepo: `npm run dev:dashboard` / `npm run start:dashboard`
 
 | Ruta | Qué hace |
 |---|---|
-| `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover). |
+| `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
 | `/settings` | Ajustes por usuario (p.ej. "repaso solo con temas estrenados"). |
 | `/api/topics/[id]` | `PATCH` (nombre/descripción) · `DELETE` (borrar topic) · `GET`. |
 | `/api/topics/[id]/groups` | `POST { name }` (agregar/crear grupo) · `DELETE ?groupId=` (quitar). |
 | `/api/topics/merge` | `POST { sourceId, targetId }` — fusiona el origen en el destino. |
 | `/api/groups` | `GET` — todos los grupos del usuario (selector). |
+| `/api/groups/[id]` | `DELETE` — borra el grupo entero (no sus topics; repunta el primario). |
 | `/api/subsections/[id]` | `PATCH { name }` — renombra subsección. |
 | `/api/recalls/[id]` | `PATCH { feedback }` · `DELETE`. |
 | `/api/settings` | `GET` / `PATCH` ajustes del usuario actual. |
@@ -46,7 +47,9 @@ lib/db.ts                      — queries de lectura a Supabase (dashboard)
 lib/supabase.ts                — cliente Supabase compartido
 app/page.tsx                   — página principal (Server Component)
 app/topics/[id]/page.tsx       — detalle del topic (Server Component)
-components/dashboard-filters.tsx — lista + filtros + renombrar/fusionar/borrar (Client)
+components/dashboard-filters.tsx — lista + filtros + renombrar/fusionar/borrar + grupos por fila + selección múltiple (Client)
+components/group-editor.tsx     — GroupCombobox (sin datalist) + GroupChips reutilizables
+components/group-stat-cards.tsx — tarjetas de resumen por grupo con borrar grupo (Client)
 components/topic-detail-header.tsx — header editable del detalle (nombre, descripción, borrar)
 components/subsection-list.tsx — renombrar subsecciones inline
 components/topic-sessions.tsx  — historial; borrar recall y editar su feedback

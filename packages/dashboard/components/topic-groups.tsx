@@ -2,17 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Badge } from "@/components/ui/badge"
-import { IconX, IconPlus } from "@tabler/icons-react"
+import { GroupChips, type GroupRef } from "@/components/group-editor"
 
-export interface GroupRef {
-  id: number
-  name: string
-}
+export type { GroupRef }
 
-// Edición de los grupos de un topic (muchos-a-muchos). Chips con × para quitar y
-// un control "+ grupo" con autocompletado de grupos existentes (o crear uno nuevo).
-// Optimista con rollback; se sincroniza con el servidor vía router.refresh().
+// Editor de grupos del topic en la página de detalle. Maneja estado optimista +
+// llamadas a la API; la presentación (chips + combobox) vive en GroupChips.
 export function TopicGroups({
   topicId,
   initialGroups,
@@ -24,21 +19,10 @@ export function TopicGroups({
 }) {
   const router = useRouter()
   const [groups, setGroups] = useState<GroupRef[]>(initialGroups)
-  const [adding, setAdding] = useState(false)
-  const [value, setValue] = useState("")
   const [busy, setBusy] = useState(false)
-  const listId = `groups-${topicId}`
 
-  // Sugerencias: grupos existentes que el topic aún no tiene.
-  const suggestions = allGroups.filter((g) => !groups.some((x) => x.id === g.id))
-
-  async function addGroup() {
-    const name = value.trim()
-    setValue("")
-    setAdding(false)
-    if (!name) return
+  async function add(name: string) {
     if (groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) return
-
     setBusy(true)
     const res = await fetch(`/api/topics/${topicId}/groups`, {
       method: "POST",
@@ -56,7 +40,7 @@ export function TopicGroups({
     router.refresh()
   }
 
-  async function removeGroup(group: GroupRef) {
+  async function remove(group: GroupRef) {
     const prev = groups
     setGroups((gs) => gs.filter((g) => g.id !== group.id))
     setBusy(true)
@@ -72,53 +56,8 @@ export function TopicGroups({
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      {groups.map((g) => (
-        <Badge key={g.id} variant="outline" className="gap-1 pr-1">
-          {g.name}
-          <button
-            onClick={() => removeGroup(g)}
-            disabled={busy}
-            title={`Quitar de "${g.name}"`}
-            className="rounded-sm text-muted-foreground hover:text-destructive disabled:opacity-50"
-          >
-            <IconX className="size-3" />
-          </button>
-        </Badge>
-      ))}
-
-      {adding ? (
-        <>
-          <input
-            autoFocus
-            list={listId}
-            value={value}
-            disabled={busy}
-            placeholder="Grupo…"
-            onChange={(e) => setValue(e.target.value)}
-            onBlur={addGroup}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addGroup()
-              if (e.key === "Escape") { setValue(""); setAdding(false) }
-            }}
-            className="h-6 w-32 rounded border border-ring bg-background px-1.5 text-xs outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
-          />
-          <datalist id={listId}>
-            {suggestions.map((g) => (
-              <option key={g.id} value={g.name} />
-            ))}
-          </datalist>
-        </>
-      ) : (
-        <button
-          onClick={() => setAdding(true)}
-          disabled={busy}
-          className="inline-flex items-center gap-0.5 rounded border border-dashed border-muted-foreground/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground disabled:opacity-50"
-        >
-          <IconPlus className="size-3" />
-          grupo
-        </button>
-      )}
+    <div className="mt-3">
+      <GroupChips groups={groups} allGroups={allGroups} onAdd={add} onRemove={remove} busy={busy} />
     </div>
   )
 }

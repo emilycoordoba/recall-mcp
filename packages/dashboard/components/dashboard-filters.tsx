@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { GroupChips, GroupCombobox, type GroupRef } from "@/components/group-editor"
 import type { TopicRow } from "@/lib/db"
 
 type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc" | "overdue_desc" | "overdue_asc"
@@ -37,6 +38,33 @@ function daysSince(iso: string | null): number | null {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return null
   return Math.floor((Date.now() - d.getTime()) / 86_400_000)
+}
+
+// Helpers de API para grupos de un topic. Devuelven el resultado (o null/false)
+// para que cada caller decida cómo reconciliar el estado local.
+async function apiAddGroup(topicId: number, name: string): Promise<GroupRef | null> {
+  const res = await fetch(`/api/topics/${topicId}/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    alert(data.error ?? "No se pudo agregar el grupo")
+    return null
+  }
+  const { group } = (await res.json()) as { group: GroupRef }
+  return group
+}
+
+async function apiRemoveGroup(topicId: number, groupId: number): Promise<boolean> {
+  const res = await fetch(`/api/topics/${topicId}/groups?groupId=${groupId}`, { method: "DELETE" })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    alert(data.error ?? "No se pudo quitar el grupo")
+    return false
+  }
+  return true
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
@@ -205,11 +233,14 @@ function RowActions({
 interface Props {
   topics: TopicRow[]
   groups: string[]
+  allGroups: GroupRef[]
 }
 
-export function DashboardFilters({ topics, groups }: Props) {
+export function DashboardFilters({ topics, groups, allGroups }: Props) {
   const router = useRouter()
   const [localTopics, setLocalTopics] = useState(topics)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [search, setSearch] = useState("")
   const [group, setGroup] = useState(() => {
     if (typeof window === "undefined") return "all"
@@ -238,9 +269,19 @@ export function DashboardFilters({ topics, groups }: Props) {
     }
   }
 
+  function deselect(id: number) {
+    setSelected((s) => {
+      if (!s.has(id)) return s
+      const next = new Set(s)
+      next.delete(id)
+      return next
+    })
+  }
+
   async function handleDelete(id: number) {
     const prev = localTopics
     setLocalTopics((ts) => ts.filter((t) => t.id !== id))
+    deselect(id)
     const res = await fetch(`/api/topics/${id}`, { method: "DELETE" })
     if (!res.ok) {
       setLocalTopics(prev)
@@ -254,6 +295,7 @@ export function DashboardFilters({ topics, groups }: Props) {
   async function handleMerge(sourceId: number, targetId: number) {
     const prev = localTopics
     setLocalTopics((ts) => ts.filter((t) => t.id !== sourceId))
+    deselect(sourceId)
     const res = await fetch(`/api/topics/merge`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -266,6 +308,61 @@ export function DashboardFilters({ topics, groups }: Props) {
     } else {
       router.refresh()
     }
+  }
+
+  // --- Grupos por fila (optimista) ---
+  async function addGroupToTopic(topicId: number, name: string) {
+    const group = await apiAddGroup(topicId, name)
+    if (!group) return
+    setLocalTopics((ts) => ts.map((t) => {
+      if (t.id !== topicId || t.groups.some((g) => g.id === group.id)) return t
+      return { ...t, groups: [...t.groups, group].sort((a, b) => a.name.localeCompare(b.name)) }
+    }))
+    router.refresh()
+  }
+
+  async function removeGroupFromTopic(topicId: number, groupId: number) {
+    const prev = localTopics
+    setLocalTopics((ts) => ts.map((t) => t.id === topicId ? { ...t, groups: t.groups.filter((g) => g.id !== groupId) } : t))
+    const ok = await apiRemoveGroup(topicId, groupId)
+    if (!ok) { setLocalTopics(prev); return }
+    router.refresh()
+  }
+
+  // --- Selección múltiple + acciones masivas ---
+  function toggleSelect(id: number) {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function bulkAddGroup(name: string) {
+    const ids = [...selected]
+    if (ids.length === 0) return
+    setBulkBusy(true)
+    const results = await Promise.all(ids.map((id) => apiAddGroup(id, name)))
+    setLocalTopics((ts) => ts.map((t) => {
+      const idx = ids.indexOf(t.id)
+      const group = idx === -1 ? null : results[idx]
+      if (!group || t.groups.some((g) => g.id === group.id)) return t
+      return { ...t, groups: [...t.groups, group].sort((a, b) => a.name.localeCompare(b.name)) }
+    }))
+    setBulkBusy(false)
+    router.refresh()
+  }
+
+  async function bulkRemoveGroup(groupId: number) {
+    const ids = selectedTopics.filter((t) => t.groups.some((g) => g.id === groupId)).map((t) => t.id)
+    if (ids.length === 0) return
+    setBulkBusy(true)
+    const results = await Promise.all(ids.map((id) => apiRemoveGroup(id, groupId)))
+    const okIds = ids.filter((_, i) => results[i])
+    setLocalTopics((ts) => ts.map((t) => okIds.includes(t.id) ? { ...t, groups: t.groups.filter((g) => g.id !== groupId) } : t))
+    setBulkBusy(false)
+    router.refresh()
   }
 
   const filtered = localTopics
@@ -288,6 +385,27 @@ export function DashboardFilters({ topics, groups }: Props) {
         default:              return a.name.localeCompare(b.name)
       }
     })
+
+  // Selección efectiva: solo los topics visibles (filtrados) que están marcados.
+  const selectedTopics = filtered.filter((t) => selected.has(t.id))
+  const allFilteredSelected = filtered.length > 0 && filtered.every((t) => selected.has(t.id))
+  const someFilteredSelected = filtered.some((t) => selected.has(t.id))
+  // Grupos presentes en la selección (dedupe por id) → opciones de "Quitar de".
+  const groupsInSelection = Array.from(
+    new Map(selectedTopics.flatMap((t) => t.groups).map((g) => [g.id, g])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name))
+
+  function toggleSelectAll() {
+    setSelected((s) => {
+      const next = new Set(s)
+      if (filtered.length > 0 && filtered.every((t) => next.has(t.id))) {
+        filtered.forEach((t) => next.delete(t.id))
+      } else {
+        filtered.forEach((t) => next.add(t.id))
+      }
+      return next
+    })
+  }
 
   return (
     <>
@@ -334,10 +452,56 @@ export function DashboardFilters({ topics, groups }: Props) {
         </Select>
       </div>
 
+      {/* Barra de acciones masivas — aparece al seleccionar filas */}
+      {selectedTopics.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+          <span className="font-medium">{selectedTopics.length} seleccionado{selectedTopics.length === 1 ? "" : "s"}</span>
+
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            Agrupar en
+            <GroupCombobox
+              allGroups={allGroups}
+              exclude={[]}
+              onPick={bulkAddGroup}
+              disabled={bulkBusy}
+            />
+          </span>
+
+          {groupsInSelection.length > 0 && (
+            <Select disabled={bulkBusy} onValueChange={(v) => bulkRemoveGroup(Number(v))}>
+              <SelectTrigger className="h-7 w-44 px-2 py-1 text-xs">
+                <SelectValue placeholder="Quitar de…" />
+              </SelectTrigger>
+              <SelectContent>
+                {groupsInSelection.map((g) => (
+                  <SelectItem key={g.id} value={String(g.id)} className="text-xs">
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+            Limpiar selección
+          </Button>
+        </div>
+      )}
+
       <div className="mt-6 overflow-hidden rounded-lg ring-1 ring-border">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-px">
+                <input
+                  type="checkbox"
+                  aria-label="Seleccionar todos"
+                  className="size-4 align-middle accent-primary"
+                  checked={allFilteredSelected}
+                  ref={(el) => { if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected }}
+                  onChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead>Topic</TableHead>
               <TableHead>Group</TableHead>
               <TableHead className="text-center">Last Score</TableHead>
@@ -350,26 +514,32 @@ export function DashboardFilters({ topics, groups }: Props) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                   No topics found
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((topic) => (
-                  <TableRow key={topic.id} className="group/row">
+                  <TableRow key={topic.id} data-state={selected.has(topic.id) ? "selected" : undefined} className="group/row">
+                    <TableCell>
+                      <input
+                        type="checkbox"
+                        aria-label={`Seleccionar ${topic.name}`}
+                        className="size-4 align-middle accent-primary"
+                        checked={selected.has(topic.id)}
+                        onChange={() => toggleSelect(topic.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <TopicNameCell topic={topic} onRename={handleRename} />
                     </TableCell>
                     <TableCell>
-                      {topic.groups.length > 0 ? (
-                        <span className="flex flex-wrap gap-1">
-                          {topic.groups.map((g) => (
-                            <Badge key={g.id} variant="outline">{g.name}</Badge>
-                          ))}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      <GroupChips
+                        groups={topic.groups}
+                        allGroups={allGroups}
+                        onAdd={(name) => addGroupToTopic(topic.id, name)}
+                        onRemove={(g) => removeGroupFromTopic(topic.id, g.id)}
+                      />
                     </TableCell>
                     <TableCell className="text-center">
                       <span className="inline-flex items-center gap-1">
