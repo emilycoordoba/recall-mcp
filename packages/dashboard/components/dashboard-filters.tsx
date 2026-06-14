@@ -365,6 +365,30 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
     router.refresh()
   }
 
+  async function bulkDelete() {
+    const ids = selectedTopics.map((t) => t.id)
+    if (ids.length === 0) return
+    if (!confirm(`¿Borrar ${ids.length} topic${ids.length === 1 ? "" : "s"} y todo su historial? Esta acción no se puede deshacer.`)) return
+    const prev = localTopics
+    setBulkBusy(true)
+    setLocalTopics((ts) => ts.filter((t) => !ids.includes(t.id)))
+    const results = await Promise.all(ids.map((id) => fetch(`/api/topics/${id}`, { method: "DELETE" })))
+    const failedIds = ids.filter((_, i) => !results[i].ok)
+    setBulkBusy(false)
+    if (failedIds.length > 0) {
+      // Restaura solo los que fallaron; los borrados con éxito quedan fuera.
+      const failedTopics = prev.filter((t) => failedIds.includes(t.id))
+      setLocalTopics((ts) => [...ts, ...failedTopics])
+      alert(`No se pudieron borrar ${failedIds.length} de ${ids.length} topics.`)
+    }
+    setSelected((s) => {
+      const next = new Set(s)
+      ids.forEach((id) => { if (!failedIds.includes(id)) next.delete(id) })
+      return next
+    })
+    router.refresh()
+  }
+
   const filtered = localTopics
     .filter((t) => group === "all" || t.groups.some((g) => g.name === group))
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
@@ -482,7 +506,17 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
             </Select>
           )}
 
-          <Button variant="ghost" size="sm" className="ml-auto h-7 text-xs" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-7 gap-1 text-xs text-muted-foreground hover:text-destructive"
+            disabled={bulkBusy}
+            onClick={bulkDelete}
+          >
+            <IconTrash className="size-3.5" />
+            Borrar
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
             Limpiar selección
           </Button>
         </div>
