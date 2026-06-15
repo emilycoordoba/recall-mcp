@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { USER_HEADER } from "./auth-constants";
 
 export { USER_HEADER } from "./auth-constants";
-export { getUserByDashboardCreds, type DashboardUser } from "./auth-shared";
+export { type DashboardUser } from "./auth-shared";
 
 // Current user id for the request. Throws if the middleware did not set it,
 // which should be impossible for any matched (auth-protected) route.

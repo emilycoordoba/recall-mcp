@@ -27,19 +27,19 @@ export default async function AuthorizePage({ searchParams }: Props) {
           {params.scope && <input type="hidden" name="scope" value={params.scope} />}
 
           <div className="space-y-2">
-            <label className="text-gray-300 text-sm font-medium" htmlFor="username">
-              Usuario
+            <label className="text-gray-300 text-sm font-medium" htmlFor="email">
+              Email
             </label>
             <input
-              id="username"
-              type="text"
-              name="username"
+              id="email"
+              type="email"
+              name="email"
               required
               autoFocus
               autoCapitalize="none"
               autoCorrect="off"
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              placeholder="lesty"
+              placeholder="tu@email.com"
             />
           </div>
 
@@ -58,7 +58,7 @@ export default async function AuthorizePage({ searchParams }: Props) {
           </div>
 
           {params.error && (
-            <p className="text-red-400 text-sm">Contraseña incorrecta.</p>
+            <p className="text-red-400 text-sm">Email o contraseña incorrectos.</p>
           )}
 
           <button

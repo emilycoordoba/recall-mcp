@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "crypto";
-import { getUserByDashboardCreds } from "@/lib/auth-shared";
+import { getUserByAuthCreds } from "@/lib/auth-shared";
 
 function b64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
@@ -18,7 +18,7 @@ function generateCode(payload: object): string {
 export async function POST(request: Request) {
   const body = new URLSearchParams(await request.text());
 
-  const username = body.get("username") ?? "";
+  const email = body.get("email") ?? "";
   const password = body.get("password") ?? "";
   const redirectUri = body.get("redirect_uri") ?? "";
   const codeChallenge = body.get("code_challenge") ?? "";
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     ...(state ? { state } : {}),
   });
 
-  const user = await getUserByDashboardCreds(username, password);
+  const user = await getUserByAuthCreds(email, password);
   if (!user) {
     return Response.redirect(
       new URL(`/authorize?${authorizeParams}`, request.url),
