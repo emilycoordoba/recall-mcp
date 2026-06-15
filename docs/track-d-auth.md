@@ -56,16 +56,23 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
   - Script `scripts/seed-auth-users.mjs`: crea usuarios en `auth.users` a partir
     de las credenciales existentes (`dashboard_user`/`dashboard_pass`) y linkea
     `auth_id`. Idempotente. Requiere service_role key + emails.
-- **D2 — Login Supabase Auth en el dashboard.**
+- **D2 — Login Supabase Auth en el dashboard.** ✅ en esta rama:
   - `@supabase/ssr` + `supabase-server.ts` / `supabase-middleware.ts`.
-  - Páginas `/login`, `/signup`, logout; middleware valida sesión (reemplaza Basic).
-  - `currentUserId()` resuelve sesión → `auth_id` → `users.id`.
-  - `db.ts` usa el cliente con sesión (RLS-ready) en vez del anon global.
-  - MCP/`db-mcp.ts` pasan a `supabase-admin`.
-  - **Verificar**: ambas usuarias entran y ven SOLO sus datos (aún pre-RLS).
+  - Página `/login` (Server Component + Server Action) y logout (`/auth/signout`,
+    botón "Salir"); middleware valida sesión y redirige (reemplaza Basic).
+  - `currentUserId()` lee `users.id` del header que pone el middleware, resuelto
+    de `app_metadata.app_user_id` (sin query a la DB).
+  - MCP/`db-mcp.ts` pasan a `supabase-admin` (service-role).
+  - **Verificado**: redirects de rutas protegidas → `/login`; `signInWithPassword`
+    OK para ambas con `app_user_id` == `users.id` (aún pre-RLS).
+  - Pendiente para D3: `db.ts` sigue usando el anon global de `lib/supabase.ts`
+    (válido pre-RLS); su cambio al cliente con sesión va junto con activar RLS.
+  - `/signup` se difiere a D4 (signup público).
 - **D3 — Activar RLS.** Migración `2026-06-14_rls-policies.sql`: helper `app_uid()`
-  + políticas + `enable row level security` tabla por tabla. Verificar dashboard
-  después de cada una. MCP no se afecta (service-role).
+  + políticas + `enable row level security` tabla por tabla. Antes de activar:
+  `db.ts` → `getServerSupabase()` (cliente con sesión) y `auth-shared` (lectura de
+  `users` para OAuth/MCP) → `supabase-admin`, porque bajo RLS el anon no ve nada.
+  Verificar dashboard después de cada tabla. MCP no se afecta (service-role).
 - **D4 — Signup público + limpieza.** `/signup` crea auth user + fila `users` +
   `mcp_token`. Eliminar columna `dashboard_pass`. Actualizar `docs/multiuser.md`.
 
@@ -92,8 +99,12 @@ por service-role (signup/admin).
 
 ## Inputs necesarios de la dueña
 
-1. **`SUPABASE_SERVICE_ROLE_KEY`** en `.env.local` (Supabase → Settings → API).
-2. **Emails** para cada usuaria (Supabase Auth identifica por email, no username):
-   Emily (`emilycoordoba@gmail.com`?) y Lesty (¿cuál?).
-3. Confirmar que el login del dashboard pasa de **usuario** a **email**.
-4. Correr la migración `2026-06-14_auth-id.sql` en el SQL editor.
+D1–D2 ya quedaron resueltos:
+1. ~~`SUPABASE_SERVICE_ROLE_KEY` en `.env.local`~~ ✅
+2. ~~Emails~~ ✅ Emily `emilycoordoba@gmail.com`, Lesty `lesty.cordoba@gmail.com`.
+3. ~~Login pasa de usuario a email~~ ✅ (la página `/login` pide email).
+4. ~~Correr `2026-06-14_auth-id.sql`~~ ✅ (columna `auth_id` creada y sembrada).
+
+Para **D3** (activar RLS), antes de correr `2026-06-14_rls-policies.sql`:
+- Confirmar **snapshot/backup de Supabase** (datos reales de Lesty).
+- Tener el dashboard a mano para verificar tabla por tabla tras cada `enable`.
