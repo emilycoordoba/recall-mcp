@@ -65,7 +65,7 @@ components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table
 
 **Grupos muchos-a-muchos con "primario" (Track C)** — un topic puede tener varios grupos vía `topic_group_links`, pero `topics.group_id` se conserva como el grupo **primario** (lo que siguen usando las tools MCP, el plan de repaso y stats; la edición multi-grupo es solo del dashboard). Dos consecuencias:
 - **Embeds ambiguos**: al existir dos caminos FK entre `topics` y `topic_groups` (`group_id` directo y vía el join table), PostgREST falla con `PGRST201` en `topic_groups(...)`. Hay que nombrar la FK del primario: `topic_groups!topics_group_id_fkey(name)`. Los grupos completos se leen aparte (`groupsByTopic` en `lib/db.ts`), no por embed.
-- **RLS off**: `topic_group_links` debe tener RLS deshabilitado como el resto del esquema (aislamiento a nivel app). Si nace con RLS, el anon key no ve el backfill (lectura vacía silenciosa) ni puede escribir (`42501`).
+- **RLS (Track D)**: `topic_group_links` tiene RLS activo con política `user_id = app_uid()`, igual que el resto del esquema. El dashboard lee/escribe con el cliente **con sesión** (`getServerSupabase`), así que `app_uid()` resuelve y las políticas dejan pasar; el MCP usa `service_role` y salta RLS. Si alguna vez una lectura sale vacía en silencio, sospechar de la sesión (sin `auth.uid()` → `app_uid()` NULL → 0 filas), no de la query.
 
 **Sorting del lado del servidor** — la página principal recibe `searchParams` y ordena en el Server Component. `DashboardFilters` solo actualiza los query params via router.
 

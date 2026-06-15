@@ -42,24 +42,24 @@ usuarios reales, identificados por token.
 - **Lesty** (id 2): nueva. Token y credenciales de dashboard generados aparte
   (no en el repo). Sin datos aún.
 
-## Aislamiento — verificado / pendiente
+## Aislamiento — verificado
 
-- ✅ Esquema: backfill correcto (Emily 54 topics/69 recalls; Lesty 0). Unicidad
-  por-usuario probada vía SQL (cross-user permitido, same-user bloqueado).
-- ⏳ Typecheck de TS: no ejecutado.
-- ⏳ Prueba funcional end-to-end con dos tokens: pendiente.
+- ✅ Esquema: backfill correcto. Unicidad por-usuario probada vía SQL.
+- ✅ **RLS activo y verificado** (Track D, ver `docs/track-d-auth.md`). Prueba a
+  nivel DB: una sesión consultando `topics` **sin** filtro `user_id` recibe solo
+  sus filas (Emily 57, Lesty 42, 0 cruzadas). El aislamiento ya NO depende solo
+  de la app: lo impone Postgres vía las políticas `user_id = app_uid()`.
 
 ## Deuda conocida
 
-- **RLS deshabilitado** en las 9 tablas (aviso crítico de Supabase). El
-  aislamiento es **a nivel de aplicación** (`.eq("user_id", …)` en cada query).
-  Un query sin filtrar = fuga entre usuarios. Mitigación real = RLS, que requiere
-  que la DB conozca al usuario → llega con Supabase Auth (aplazado). Aceptable
-  para 2 usuarias de confianza; **revisar antes de cualquier signup público**.
-  SQL de remediación (no aplicar sin políticas):
-  `ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY;` para las 9 tablas.
-- `dashboard_pass` se guarda en **texto plano** (paridad con el esquema previo de
-  contraseña única por env). Hashear cuando se aborde Supabase Auth.
+- ✅ ~~RLS deshabilitado~~ — **resuelto en Track D**: RLS activo en las 11 tablas
+  (9 con `user_id` directo + 2 nietas vía padre), políticas `user_id = app_uid()`,
+  y el dashboard usa el cliente con sesión. El MCP usa `service_role` (salta RLS);
+  su token ya scopea al usuario. `.eq("user_id", …)` se mantiene en las queries
+  como defensa en profundidad. **Ya seguro para signup público** (pendiente D4).
+- `dashboard_pass` aún en **texto plano**: lo usa solo el path OAuth/MCP
+  (`getUserByDashboardCreds`). El login del dashboard ya pasó a Supabase Auth (que
+  hashea internamente). Eliminar la columna y migrar OAuth → D4.
 
 ## Backup
 

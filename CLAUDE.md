@@ -21,7 +21,7 @@ Claude Desktop ──HTTP──▶ Vercel (/api/mcp) ──▶ Supabase ◀─�
 - El MCP server vive en `packages/dashboard/pages/api/mcp.ts` (HTTP, Streamable MCP)
 - La lógica de tools está en `packages/dashboard/lib/mcp-server.ts`
 - Las queries a Supabase están en `packages/dashboard/lib/db-mcp.ts` (escritura) y `lib/db.ts` (lectura dashboard)
-- **Multiusuario**: cada usuario se identifica por token (MCP) o Basic auth (dashboard) contra la tabla `users`; todos los datos se filtran por `user_id`. Ver `docs/multiuser.md`. Deuda: RLS deshabilitado, aislamiento solo a nivel app.
+- **Multiusuario**: cada usuario se identifica por token (MCP) o **Supabase Auth** (dashboard, login con email) contra la tabla `users`; todos los datos se filtran por `user_id`. Ver `docs/multiuser.md` y `docs/track-d-auth.md`. **RLS activo** en las 11 tablas (aislamiento impuesto por la DB vía `app_uid()`); el MCP usa `service_role` y salta RLS (su token ya scopea al usuario).
 
 ## Cómo funciona el sistema
 
