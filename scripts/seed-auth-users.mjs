@@ -27,7 +27,7 @@ if (!URL || !SERVICE_KEY) {
 // ── Mapa dashboard_user → email. Completar antes de correr. ──
 const EMAILS = {
   emily: "emilycoordoba@gmail.com",
-  // lesty: "<email-de-lesty>",
+  lesty: "lesty.cordoba@gmail.com",
 };
 
 const admin = createClient(URL, SERVICE_KEY, {
@@ -90,6 +90,16 @@ async function main() {
         continue;
       }
       console.log(`  ↳ users.id ${u.id}.auth_id = ${authUser.id}`);
+    }
+
+    // Guarda el users.id (int) en app_metadata del JWT para que el middleware lo
+    // lea sin consultar la DB. app_metadata no es editable por el usuario.
+    if (authUser.app_metadata?.app_user_id !== u.id) {
+      const { error: metaErr } = await admin.auth.admin.updateUserById(authUser.id, {
+        app_metadata: { app_user_id: u.id },
+      });
+      if (metaErr) console.error(`✗ ${email}: no se pudo set app_metadata →`, metaErr.message);
+      else console.log(`  ↳ app_metadata.app_user_id = ${u.id}`);
     }
   }
   console.log("Listo.");

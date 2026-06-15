@@ -1,4 +1,6 @@
-import { supabase } from "./supabase";
+// El MCP usa el cliente service-role: SALTA RLS. El aislamiento se mantiene a
+// nivel app (`.eq("user_id", …)`) y el Bearer token ya scopea al usuario.
+import { supabaseAdmin as supabase } from "./supabase-admin";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

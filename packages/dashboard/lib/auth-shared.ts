@@ -1,11 +1,8 @@
 import { supabase } from "./supabase";
 
-// Header set by middleware once Basic auth resolves to a user. Server Components
-// and route handlers read the current user from here — never trust the client.
-// This module must NOT import next/headers so it stays usable from middleware
-// (Edge runtime), where next/headers is unavailable.
-export const USER_HEADER = "x-recall-user-id";
-
+// Credenciales de Claude Desktop (OAuth) → usuario. Sigue validando contra
+// `users.dashboard_user`/`dashboard_pass`; el MCP no usa Supabase Auth. Este
+// módulo NO importa next/headers para seguir siendo usable desde el Edge runtime.
 export interface DashboardUser {
   id: number;
   name: string;

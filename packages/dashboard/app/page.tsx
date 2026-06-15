@@ -4,6 +4,7 @@ import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
 import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
 import { Logo } from "@/components/logo"
+import { LogoutButton } from "@/components/logout-button"
 
 function groupStats(topics: TopicRow[]): GroupStat[] {
   // Agrupa por id (no por nombre) para poder borrar el grupo desde la tarjeta.
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
           <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
             Ajustes
           </Link>
+          <LogoutButton />
         </nav>
       </div>
 
