@@ -68,11 +68,15 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
   - Pendiente para D3: `db.ts` sigue usando el anon global de `lib/supabase.ts`
     (válido pre-RLS); su cambio al cliente con sesión va junto con activar RLS.
   - `/signup` se difiere a D4 (signup público).
-- **D3 — Activar RLS.** Migración `2026-06-14_rls-policies.sql`: helper `app_uid()`
-  + políticas + `enable row level security` tabla por tabla. Antes de activar:
-  `db.ts` → `getServerSupabase()` (cliente con sesión) y `auth-shared` (lectura de
-  `users` para OAuth/MCP) → `supabase-admin`, porque bajo RLS el anon no ve nada.
-  Verificar dashboard después de cada tabla. MCP no se afecta (service-role).
+- **D3 — Activar RLS.**
+  - Refactor RLS-ready (no destructivo) ✅: `db.ts` → `getServerSupabase()`
+    (cliente con sesión, por request) y `auth-shared` → `supabase-admin`
+    (service-role), porque bajo RLS el anon no ve nada. `lib/supabase.ts`
+    (anon global) eliminado. Verificado pre-RLS (login real → `GET /` 200).
+  - **Pendiente (sensible)**: correr `2026-06-14_rls-policies.sql` — helper
+    `app_uid()` + políticas + `enable row level security` tabla por tabla,
+    verificando el dashboard tras cada `enable`. Requiere snapshot de Supabase
+    confirmado antes (datos reales de Lesty). MCP no se afecta (service-role).
 - **D4 — Signup público + limpieza.** `/signup` crea auth user + fila `users` +
   `mcp_token`. Eliminar columna `dashboard_pass`. Actualizar `docs/multiuser.md`.
 
