@@ -1,8 +1,10 @@
-import { supabase } from "./supabase";
+import { supabaseAdmin as supabase } from "./supabase-admin";
 
 // Credenciales de Claude Desktop (OAuth) → usuario. Sigue validando contra
-// `users.dashboard_user`/`dashboard_pass`; el MCP no usa Supabase Auth. Este
-// módulo NO importa next/headers para seguir siendo usable desde el Edge runtime.
+// `users.dashboard_user`/`dashboard_pass`; el MCP no usa Supabase Auth. Usa el
+// cliente service-role porque lee la tabla `users` SIN sesión (no hay auth.uid()),
+// así que bajo RLS el anon no vería nada. NO importa next/headers para seguir
+// siendo usable desde el Edge runtime.
 export interface DashboardUser {
   id: number;
   name: string;

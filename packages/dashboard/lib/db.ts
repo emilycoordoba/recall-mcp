@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getServerSupabase } from "./supabase-server";
 
 const RECENT_WINDOW = 5;
 
@@ -13,6 +13,7 @@ async function groupsByTopic(topicIds: number[], userId: number): Promise<Map<nu
   const map = new Map<number, GroupRef[]>();
   if (topicIds.length === 0) return map;
 
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topic_group_links")
     .select("topic_id, topic_groups(id, name)")
@@ -119,6 +120,7 @@ export interface QuickReviewAnswerRow {
 }
 
 export async function getStudyStreak(userId: number): Promise<number> {
+  const supabase = await getServerSupabase();
   const [{ data: recalls }, { data: qrs }] = await Promise.all([
     supabase.from("recalls").select("recalled_at").eq("user_id", userId),
     supabase.from("quick_review_sessions").select("reviewed_at").eq("user_id", userId),
@@ -139,6 +141,7 @@ export async function getStudyStreak(userId: number): Promise<number> {
 }
 
 export async function getTopics(userId: number): Promise<TopicRow[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topics")
     .select(`
@@ -275,6 +278,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
 }
 
 export async function getTopic(id: number, userId: number): Promise<TopicDetail | undefined> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topics")
     .select("id, name, description, created_at, group_id, topic_groups!topics_group_id_fkey(name)")
@@ -300,6 +304,7 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
 
 // Todos los grupos del usuario (para el selector de grupos del dashboard).
 export async function getGroups(userId: number): Promise<GroupRef[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topic_groups")
     .select("id, name")
@@ -310,6 +315,7 @@ export async function getGroups(userId: number): Promise<GroupRef[]> {
 }
 
 export async function getSubsections(topicId: number, userId: number): Promise<Subsection[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topic_subsections")
     .select("*")
@@ -378,6 +384,7 @@ interface SessionRow {
 }
 
 export async function getSubsectionStats(topicId: number, userId: number): Promise<SubsectionStat[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topic_subsections")
     .select("id, topic_id, name, order_index, recall_subsections(recall_id, covered, score), quick_review_answers(score)")
@@ -401,6 +408,7 @@ export async function getSubsectionStats(topicId: number, userId: number): Promi
 }
 
 export async function getRecalls(topicId: number, userId: number): Promise<RecallRow[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("recalls")
     .select("*")
@@ -414,6 +422,7 @@ export async function getRecalls(topicId: number, userId: number): Promise<Recal
 
 export async function getRecallSubsections(recallId: number, userId: number): Promise<RecallSubsectionRow[]> {
   // recall_subsections has no user_id; scope via the owning recall (inner join).
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("recall_subsections")
     .select("recall_id, subsection_id, covered, score, topic_subsections(name, order_index), recalls!inner(user_id)")
@@ -433,6 +442,7 @@ export async function getRecallSubsections(recallId: number, userId: number): Pr
 }
 
 export async function getQuickReviews(topicId: number, userId: number): Promise<QuickReviewRow[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("quick_review_sessions")
     .select("id, topic_id, reviewed_at, overall_score, feedback")
@@ -472,6 +482,7 @@ export interface HistoryEntry {
 }
 
 export async function getHistory(userId: number): Promise<HistoryEntry[]> {
+  const supabase = await getServerSupabase();
   const [{ data: recalls, error: re }, { data: qrs, error: qe }] = await Promise.all([
     supabase
       .from("recalls")
@@ -554,6 +565,7 @@ export interface ReviewSessionEntry {
 }
 
 export async function getReviewSessions(userId: number): Promise<ReviewSessionEntry[]> {
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("review_sessions")
     .select(`
@@ -612,6 +624,7 @@ export async function getReviewSessions(userId: number): Promise<ReviewSessionEn
 
 export async function getQuickReviewAnswers(sessionId: number, userId: number): Promise<QuickReviewAnswerRow[]> {
   // quick_review_answers has no user_id; scope via the owning session (inner join).
+  const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("quick_review_answers")
     .select("id, session_id, question, answer, score, feedback, topic_subsections(name), quick_review_sessions!inner(user_id)")
