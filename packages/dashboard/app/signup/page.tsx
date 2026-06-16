@@ -2,6 +2,8 @@ import Link from "next/link";
 import { signup } from "./actions";
 import { Button } from "@/components/ui/button";
 
+export const metadata = { title: "Crear cuenta" }
+
 export default async function SignupPage({
   searchParams,
 }: {

@@ -3,6 +3,7 @@ import { currentUserId } from "@/lib/auth"
 import { BackButton } from "@/components/back-button"
 import { SettingsForm } from "@/components/settings-form"
 
+export const metadata = { title: "Ajustes" }
 export const dynamic = "force-dynamic"
 
 export default async function SettingsPage() {

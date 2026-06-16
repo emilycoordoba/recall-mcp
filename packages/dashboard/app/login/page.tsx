@@ -2,6 +2,8 @@ import Link from "next/link";
 import { login } from "./actions";
 import { Button } from "@/components/ui/button";
 
+export const metadata = { title: "Iniciar sesión" }
+
 export default async function LoginPage({
   searchParams,
 }: {
