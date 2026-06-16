@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { IconCheck, IconX, IconBolt, IconTrash } from "@tabler/icons-react"
+import { useConfirm } from "@/components/confirm-dialog"
 
 function formatDate(iso: string) {
   const d = new Date(iso)
@@ -114,7 +116,7 @@ function RecallFeedback({
     if (!res.ok) {
       setValue(initial ?? "")
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo guardar el feedback")
+      toast.error(data.error ?? "No se pudo guardar el feedback")
     } else {
       onSaved(trimmed || null)
       router.refresh()
@@ -177,18 +179,25 @@ interface Props {
 
 export function TopicSessions({ sessions, subsections }: Props) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [filter, setFilter] = useState<string>("all")
   const [localSessions, setLocalSessions] = useState(sessions)
 
   async function handleDeleteRecall(id: number) {
-    if (!confirm("¿Borrar este recall? Esta acción no se puede deshacer.")) return
+    const ok = await confirm({
+      title: "¿Borrar este recall?",
+      description: "Esta acción no se puede deshacer.",
+      confirmText: "Borrar recall",
+      destructive: true,
+    })
+    if (!ok) return
     const prev = localSessions
     setLocalSessions((ss) => ss.filter((s) => !(s.type === "recall" && s.data.id === id))) // optimistic
     const res = await fetch(`/api/recalls/${id}`, { method: "DELETE" })
     if (!res.ok) {
       setLocalSessions(prev) // rollback
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo borrar el recall")
+      toast.error(data.error ?? "No se pudo borrar el recall")
     } else {
       router.refresh()
     }
@@ -210,14 +219,14 @@ export function TopicSessions({ sessions, subsections }: Props) {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-base font-medium">Session History</h2>
+        <h2 className="text-base font-medium">Historial de sesiones</h2>
         {subsections.length > 0 && (
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="h-7 w-48 px-2 py-1.5 text-xs">
-              <SelectValue placeholder="All subsections" />
+              <SelectValue placeholder="Todas las subsecciones" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs">All subsections</SelectItem>
+              <SelectItem value="all" className="text-xs">Todas las subsecciones</SelectItem>
               {subsections.map((s) => (
                 <SelectItem key={s.id} value={s.name} className="text-xs">
                   {s.name}
@@ -230,7 +239,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {filter === "all" ? "No sessions yet." : `No sessions covering "${filter}".`}
+          {filter === "all" ? "Aún no hay sesiones." : `No hay sesiones que cubran "${filter}".`}
         </p>
       ) : (
         <div className="space-y-6">
@@ -241,7 +250,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">{formatDate(session.date)}</span>
-                      <Badge variant="outline" className="text-xs">Full recall</Badge>
+                      <Badge variant="outline" className="text-xs">Recall completo</Badge>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <ScoreBadge score={session.data.overall_score} />
@@ -263,9 +272,9 @@ export function TopicSessions({ sessions, subsections }: Props) {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Subsection</TableHead>
-                            <TableHead className="text-center w-20">Covered</TableHead>
-                            <TableHead className="text-right w-20">Score</TableHead>
+                            <TableHead>Subsección</TableHead>
+                            <TableHead className="text-center w-20">Cubierta</TableHead>
+                            <TableHead className="text-right w-20">Puntaje</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -292,7 +301,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
                   )}
                   {session.data.transcript && (
                     <div>
-                      <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Transcript</p>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Transcripción</p>
                       <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-4 py-3 text-sm leading-relaxed">
                         {session.data.transcript}
                       </p>
@@ -313,7 +322,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
                       <span className="text-xs text-muted-foreground">{formatDate(session.date)}</span>
                       <Badge variant="secondary" className="flex items-center gap-1 text-xs">
                         <IconBolt className="h-3 w-3" />
-                        Quick review
+                        Repaso rápido
                       </Badge>
                     </div>
                     <ScoreBadge score={session.data.overall_score} />

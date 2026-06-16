@@ -2,7 +2,9 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { IconX } from "@tabler/icons-react"
+import { useConfirm } from "@/components/confirm-dialog"
 
 export interface GroupStat {
   id: number
@@ -17,11 +19,18 @@ export interface GroupStat {
 // tarjeta desaparece al instante y se restaura si la API falla.
 export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [localStats, setLocalStats] = useState(stats)
   const [busyId, setBusyId] = useState<number | null>(null)
 
   async function deleteGroup(g: GroupStat) {
-    if (!confirm(`¿Borrar el grupo "${g.name}"? Sus ${g.count} topic${g.count === 1 ? "" : "s"} no se borran, solo dejan de pertenecer a este grupo.`)) return
+    const ok = await confirm({
+      title: `¿Borrar el grupo "${g.name}"?`,
+      description: `Sus ${g.count} tema${g.count === 1 ? "" : "s"} no se borran, solo dejan de pertenecer a este grupo.`,
+      confirmText: "Borrar grupo",
+      destructive: true,
+    })
+    if (!ok) return
     const prev = localStats
     setLocalStats((s) => s.filter((x) => x.id !== g.id))
     setBusyId(g.id)
@@ -30,7 +39,7 @@ export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
     if (!res.ok) {
       setLocalStats(prev)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo borrar el grupo")
+      toast.error(data.error ?? "No se pudo borrar el grupo")
       return
     }
     router.refresh()
@@ -55,7 +64,7 @@ export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {g.avg_score?.toFixed(1) ?? "—"}
           </p>
-          <p className="text-xs text-muted-foreground">{g.count} topic{g.count !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-muted-foreground">{g.count} tema{g.count !== 1 ? "s" : ""}</p>
           {g.below3 > 0 && (
             <p className="text-xs text-destructive">{g.below3} bajo 3.0</p>
           )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 interface Subsection {
   id: number
@@ -30,7 +31,7 @@ function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
     if (!res.ok) {
       setValue(sub.name)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo renombrar")
+      toast.error(data.error ?? "No se pudo renombrar")
     } else {
       router.refresh()
     }
@@ -50,7 +51,7 @@ function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
             if (e.key === "Enter") commit()
             if (e.key === "Escape") { setValue(sub.name); setEditing(false) }
           }}
-          className="flex-1 rounded border border-ring bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+          className="flex-1 rounded-md border border-ring bg-background px-1.5 py-0.5 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
         />
       ) : (
         <span className="group flex flex-1 items-center gap-1.5">

@@ -3,7 +3,9 @@
 import Link from "next/link"
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { IconTrash, IconArrowMerge, IconX } from "@tabler/icons-react"
+import { useConfirm } from "@/components/confirm-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -50,7 +52,7 @@ async function apiAddGroup(topicId: number, name: string): Promise<GroupRef | nu
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    alert(data.error ?? "No se pudo agregar el grupo")
+    toast.error(data.error ?? "No se pudo agregar el grupo")
     return null
   }
   const { group } = (await res.json()) as { group: GroupRef }
@@ -61,7 +63,7 @@ async function apiRemoveGroup(topicId: number, groupId: number): Promise<boolean
   const res = await fetch(`/api/topics/${topicId}/groups?groupId=${groupId}`, { method: "DELETE" })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    alert(data.error ?? "No se pudo quitar el grupo")
+    toast.error(data.error ?? "No se pudo quitar el grupo")
     return false
   }
   return true
@@ -143,7 +145,7 @@ function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: nu
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={onKeyDown}
-        className="w-full rounded border border-ring bg-background px-1.5 py-0.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+        className="w-full rounded-md border border-ring bg-background px-1.5 py-0.5 text-sm font-medium outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
       />
     )
   }
@@ -175,13 +177,19 @@ function RowActions({
   onMerge: (sourceId: number, targetId: number) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }) {
+  const confirm = useConfirm()
   const [merging, setMerging] = useState(false)
   const [busy, setBusy] = useState(false)
 
   async function pickTarget(targetId: string) {
     const target = targets.find((t) => String(t.id) === targetId)
     if (!target) return
-    if (!confirm(`¿Fusionar "${topic.name}" dentro de "${target.name}"? Sus recalls y subsecciones se moverán y "${topic.name}" se eliminará.`)) return
+    const ok = await confirm({
+      title: `¿Fusionar "${topic.name}" dentro de "${target.name}"?`,
+      description: `Sus recalls y subsecciones se moverán y "${topic.name}" se eliminará.`,
+      confirmText: "Fusionar",
+    })
+    if (!ok) return
     setBusy(true)
     await onMerge(topic.id, target.id)
     setBusy(false)
@@ -189,7 +197,13 @@ function RowActions({
   }
 
   async function remove() {
-    if (!confirm(`¿Borrar "${topic.name}" y todo su historial? Esta acción no se puede deshacer.`)) return
+    const ok = await confirm({
+      title: `¿Borrar "${topic.name}"?`,
+      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
+      confirmText: "Borrar tema",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     await onDelete(topic.id)
     // Component unmounts on success; resetting busy only matters if it failed.
@@ -220,10 +234,10 @@ function RowActions({
 
   return (
     <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
-      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title="Fusionar con otro topic" onClick={() => setMerging(true)}>
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title="Fusionar con otro tema" onClick={() => setMerging(true)}>
         <IconArrowMerge className="size-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title="Borrar topic" onClick={remove}>
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title="Borrar tema" onClick={remove}>
         <IconTrash className="size-3.5" />
       </Button>
     </div>
@@ -238,6 +252,7 @@ interface Props {
 
 export function DashboardFilters({ topics, groups, allGroups }: Props) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [localTopics, setLocalTopics] = useState(topics)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -263,7 +278,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "Error al renombrar")
+      toast.error(data.error ?? "Error al renombrar")
     } else {
       router.refresh()
     }
@@ -286,7 +301,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "Error al borrar")
+      toast.error(data.error ?? "Error al borrar")
     } else {
       router.refresh()
     }
@@ -304,7 +319,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "Error al fusionar")
+      toast.error(data.error ?? "Error al fusionar")
     } else {
       router.refresh()
     }
@@ -368,7 +383,13 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
   async function bulkDelete() {
     const ids = selectedTopics.map((t) => t.id)
     if (ids.length === 0) return
-    if (!confirm(`¿Borrar ${ids.length} topic${ids.length === 1 ? "" : "s"} y todo su historial? Esta acción no se puede deshacer.`)) return
+    const ok = await confirm({
+      title: `¿Borrar ${ids.length} tema${ids.length === 1 ? "" : "s"}?`,
+      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
+      confirmText: "Borrar",
+      destructive: true,
+    })
+    if (!ok) return
     const prev = localTopics
     setBulkBusy(true)
     setLocalTopics((ts) => ts.filter((t) => !ids.includes(t.id)))
@@ -379,7 +400,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
       // Restaura solo los que fallaron; los borrados con éxito quedan fuera.
       const failedTopics = prev.filter((t) => failedIds.includes(t.id))
       setLocalTopics((ts) => [...ts, ...failedTopics])
-      alert(`No se pudieron borrar ${failedIds.length} de ${ids.length} topics.`)
+      toast.error(`No se pudieron borrar ${failedIds.length} de ${ids.length} temas.`)
     }
     setSelected((s) => {
       const next = new Set(s)

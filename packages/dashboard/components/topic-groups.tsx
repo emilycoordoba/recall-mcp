@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { GroupChips, type GroupRef } from "@/components/group-editor"
 
 export type { GroupRef }
@@ -32,7 +33,7 @@ export function TopicGroups({
     setBusy(false)
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo agregar el grupo")
+      toast.error(data.error ?? "No se pudo agregar el grupo")
       return
     }
     const { group } = (await res.json()) as { group: GroupRef }
@@ -49,7 +50,7 @@ export function TopicGroups({
     if (!res.ok) {
       setGroups(prev)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo quitar el grupo")
+      toast.error(data.error ?? "No se pudo quitar el grupo")
       return
     }
     router.refresh()

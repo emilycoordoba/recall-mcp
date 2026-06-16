@@ -2,9 +2,11 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { IconTrash } from "@tabler/icons-react"
 import { TopicGroups, type GroupRef } from "@/components/topic-groups"
+import { useConfirm } from "@/components/confirm-dialog"
 
 interface Topic {
   id: number
@@ -25,6 +27,7 @@ export function TopicDetailHeader({
   quickReviewCount: number
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [name, setName] = useState(topic.name)
   const [description, setDescription] = useState(topic.description ?? "")
   const [editingName, setEditingName] = useState(false)
@@ -46,7 +49,7 @@ export function TopicDetailHeader({
     if (!res.ok) {
       onError()
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo guardar")
+      toast.error(data.error ?? "No se pudo guardar")
     } else {
       router.refresh()
     }
@@ -73,13 +76,19 @@ export function TopicDetailHeader({
   }
 
   async function remove() {
-    if (!confirm(`¿Borrar el topic "${topic.name}" y todo su historial? Esta acción no se puede deshacer.`)) return
+    const ok = await confirm({
+      title: `¿Borrar el tema "${topic.name}"?`,
+      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
+      confirmText: "Borrar tema",
+      destructive: true,
+    })
+    if (!ok) return
     setBusy(true)
     const res = await fetch(`/api/topics/${topic.id}`, { method: "DELETE" })
     if (!res.ok) {
       setBusy(false)
       const data = await res.json().catch(() => ({}))
-      alert(data.error ?? "No se pudo borrar")
+      toast.error(data.error ?? "No se pudo borrar")
       return
     }
     router.push("/")
@@ -102,7 +111,7 @@ export function TopicDetailHeader({
                 if (e.key === "Enter") commitName()
                 if (e.key === "Escape") { setName(topic.name); setEditingName(false) }
               }}
-              className="rounded border border-ring bg-background px-1.5 py-0.5 text-2xl font-semibold tracking-tight outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+              className="rounded-md border border-ring bg-background px-1.5 py-0.5 text-2xl font-semibold tracking-tight outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
             />
           ) : (
             <h1
@@ -123,7 +132,7 @@ export function TopicDetailHeader({
           size="sm"
           disabled={busy}
           onClick={remove}
-          title="Borrar topic"
+          title="Borrar tema"
         >
           <IconTrash className="size-3.5" />
           Borrar
@@ -140,13 +149,13 @@ export function TopicDetailHeader({
           disabled={busy}
           autoFocus
           rows={2}
-          placeholder="Descripción del topic…"
+          placeholder="Descripción del tema…"
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitDesc}
           onKeyDown={(e) => {
             if (e.key === "Escape") { setDescription(topic.description ?? ""); setEditingDesc(false) }
           }}
-          className="mt-2 w-full rounded border border-ring bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
+          className="mt-2 w-full rounded-md border border-ring bg-background px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50"
         />
       ) : description ? (
         <p
@@ -167,7 +176,7 @@ export function TopicDetailHeader({
       )}
 
       <p className="mt-1 text-xs text-muted-foreground">
-        {recallCount} recall{recallCount !== 1 ? "s" : ""} · {quickReviewCount} quick review{quickReviewCount !== 1 ? "s" : ""}
+        {recallCount} recall{recallCount !== 1 ? "s" : ""} · {quickReviewCount} repaso{quickReviewCount !== 1 ? "s" : ""} rápido{quickReviewCount !== 1 ? "s" : ""}
       </p>
     </div>
   )
