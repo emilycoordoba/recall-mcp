@@ -62,7 +62,8 @@ components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza con
 components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error()/toast.success()
 components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table)
 app/manifest.ts               — Web App Manifest (PWA instalable; iconos en public/ + app/apple-icon.png)
-app/loading.tsx · app/error.tsx — skeleton de Suspense y error boundary de ruta (toda la app)
+app/**/loading.tsx            — skeletons de Suspense por ruta (imitan el layout real); primitivo en components/ui/skeleton.tsx
+app/error.tsx                 — error boundary de ruta (Reintentar)
 ```
 
 **Sistema visual**: lenguaje "redondeado y cálido". Radio = un solo token

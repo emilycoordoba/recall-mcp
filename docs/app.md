@@ -239,8 +239,11 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
   `public/icon-{192,512}.png` (any) e `icon-maskable-512.png` (maskable, fondo +
   padding) + `app/apple-icon.png`. Instalable en el teléfono; **sin** modo offline
   (no hay service worker).
-- **Estados de ruta**: `app/loading.tsx` (skeleton de Suspense con la marca) y
-  `app/error.tsx` (error boundary con botón Reintentar; Client Component).
+- **Estados de ruta**: skeletons de Suspense **por segmento** que imitan el layout
+  real de cada página (`app/loading.tsx` home, más `sessions/`, `history/`,
+  `settings/` y `topics/[id]/`); cada uno renderiza el `AppHeader`/`BackButton` real
+  y placeholders con el primitivo `components/ui/skeleton.tsx`. `app/error.tsx` es el
+  error boundary (botón Reintentar; Client Component).
 
 ### Columna "Próxima"
 

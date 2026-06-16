@@ -1,0 +1,33 @@
+import { AppHeader } from "@/components/app-header"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Skeleton de /sessions: título + grupos por día con filas tipo SessionCard.
+export default function Loading() {
+  return (
+    <div className="mx-auto max-w-3xl px-6 py-10" aria-busy="true" aria-label="Cargando">
+      <AppHeader />
+      <div className="mb-8">
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="mt-2 h-4 w-36" />
+      </div>
+
+      <div className="space-y-8">
+        {Array.from({ length: 2 }).map((_, g) => (
+          <div key={g}>
+            <Skeleton className="mb-3 h-3 w-48" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-lg px-4 py-3 ring-1 ring-border">
+                  <Skeleton className="h-3 w-10 shrink-0" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="ml-auto h-5 w-10 shrink-0" />
+                  <Skeleton className="size-4 shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
