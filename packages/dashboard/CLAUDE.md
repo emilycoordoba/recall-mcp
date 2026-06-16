@@ -56,6 +56,7 @@ components/topic-detail-header.tsx — header editable del detalle (nombre, desc
 components/subsection-list.tsx — renombrar subsecciones inline
 components/topic-sessions.tsx  — historial; borrar recall y editar su feedback
 components/settings-form.tsx   — toggle de ajustes por usuario
+components/app-header.tsx      — AppHeader: nav común (marca + links + salir) en todas las páginas
 components/logo.tsx            — LogoMark + Logo (marca "Recall"); favicon en app/icon.svg
 components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza confirm() nativo)
 components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error()/toast.success()

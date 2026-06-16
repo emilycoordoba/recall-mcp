@@ -226,10 +226,15 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
 - **Título de pestaña / metadata**: `app/layout.tsx` define `metadata` con
   `title.template = "%s · Recall"` y `default = "Recall"`; cada página exporta su
   propio `title` (o `generateMetadata` con el nombre del tema en `/topics/[id]`).
+- **Navegación**: header común `components/app-header.tsx` (`<AppHeader>`) en todas
+  las páginas — marca (link al inicio) + nav (Sesiones/Historial/Ajustes/Salir) +
+  racha opcional. Unifica los tres patrones previos (nav completa, "← Dashboard",
+  "Volver"). `BackButton` queda solo para el detalle de tema.
 - **Responsive**: la lista de temas usa **tabla en ≥md y tarjetas apiladas en <md**
   (`MobileTopicCard` en `dashboard-filters.tsx`, misma lógica que la fila; las
   acciones de fila se muestran siempre en móvil vía `RowActions alwaysVisible`). El
-  header del home apila en móvil.
+  `AppHeader` apila en móvil; `session-card`/`history-entry` ya truncan y ocultan
+  badges de grupo (`hidden sm:flex`).
 - **PWA instalable**: `app/manifest.ts` (display standalone, `lang=es`) + iconos en
   `public/icon-{192,512}.png` (any) e `icon-maskable-512.png` (maskable, fondo +
   padding) + `app/apple-icon.png`. Instalable en el teléfono; **sin** modo offline
