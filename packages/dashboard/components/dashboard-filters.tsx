@@ -396,6 +396,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       const data = await res.json().catch(() => ({}))
       toast.error(data.error ?? "Error al borrar")
     } else {
+      toast.success("Tema borrado")
       router.refresh()
     }
   }

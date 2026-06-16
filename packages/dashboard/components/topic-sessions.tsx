@@ -203,6 +203,7 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
       const data = await res.json().catch(() => ({}))
       toast.error(data.error ?? "No se pudo borrar el recall")
     } else {
+      toast.success("Recall borrado")
       router.refresh()
     }
   }

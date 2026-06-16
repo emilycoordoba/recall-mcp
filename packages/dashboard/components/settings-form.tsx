@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { toast } from "sonner"
 import type { UserSettings } from "@/lib/db-mcp"
 
 function Toggle({
@@ -35,13 +36,11 @@ function Toggle({
 export function SettingsForm({ initial }: { initial: UserSettings }) {
   const [settings, setSettings] = useState(initial)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   async function update(patch: Partial<UserSettings>) {
     const prev = settings
     setSettings((s) => ({ ...s, ...patch })) // optimistic
     setSaving(true)
-    setError(null)
     const res = await fetch("/api/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -51,7 +50,9 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
     if (!res.ok) {
       setSettings(prev) // rollback
       const data = await res.json().catch(() => ({}))
-      setError(data.error ?? "No se pudo guardar")
+      toast.error(data.error ?? "No se pudo guardar")
+    } else {
+      toast.success("Ajustes guardados")
     }
   }
 
@@ -71,7 +72,6 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
           onChange={(v) => update({ review_only_practiced: v })}
         />
       </div>
-      {error && <p className="px-4 pb-3 text-xs text-destructive">{error}</p>}
     </div>
   )
 }
