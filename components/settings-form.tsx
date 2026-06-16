@@ -135,6 +135,27 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
           />
         }
       />
+
+      <Row
+        title="Ritmo de la dificultad"
+        description="Qué tan rápido escala la dificultad adaptativa. Suave sube despacio y baja ante cualquier tropiezo; exigente sube rápido y tolera más antes de bajar. Solo aplica con la dificultad adaptativa activa."
+        control={
+          <Select
+            value={settings.difficulty_pace}
+            disabled={saving || !settings.adaptive_difficulty}
+            onValueChange={(v) => update({ difficulty_pace: v as UserSettings["difficulty_pace"] })}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="suave">Suave</SelectItem>
+              <SelectItem value="normal">Normal</SelectItem>
+              <SelectItem value="exigente">Exigente</SelectItem>
+            </SelectContent>
+          </Select>
+        }
+      />
     </div>
   )
 }

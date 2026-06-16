@@ -33,6 +33,9 @@ export async function PATCH(req: Request) {
     if (typeof body?.adaptive_difficulty === "boolean") {
       patch.adaptive_difficulty = body.adaptive_difficulty
     }
+    if (body?.difficulty_pace === "suave" || body?.difficulty_pace === "normal" || body?.difficulty_pace === "exigente") {
+      patch.difficulty_pace = body.difficulty_pace
+    }
     // Only accept real IANA zone ids so a bad client value can't corrupt every
     // server-side day computation (streak, SM-2, day headers).
     if (isValidTimeZone(body?.timezone)) {

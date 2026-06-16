@@ -114,6 +114,10 @@ que se logró es ambiguo.
   escalera *intra-sesión*. `get_review_plan` lo expone en `settings.adaptive_difficulty`
   y el prompt de mate lo honra: `true` = sube/baja en vivo desde `suggested_difficulty`;
   `false` = mantiene el nivel sugerido todo el subtema. Es soft (lo interpreta la IA).
+- `difficulty_pace` (`suave`/`normal`/`exigente`, default `normal`): qué tan rápido
+  escala la escalera *intra-sesión* (suave: sube tras 3 aciertos / baja ante cualquier
+  fallo; normal: 2 / <3; exigente: 1 acierto ≥4.5 / tolera más). También soft; no
+  toca la regla entre-sesiones de `suggestDifficulty`.
 - `review_slots` (2–6, default 4): cuántos subtemas trae la sesión. Para mate, donde
   todos los slots son ejercicios quick, se lee como "cuántos subtemas practica por
   sesión". Server-enforced en `getReviewPlan` (recorta/extiende).

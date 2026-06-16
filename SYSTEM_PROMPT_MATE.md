@@ -71,13 +71,18 @@ mano, solo entendé qué esperar):
 Un subtema con score ≥4.5 sostenido **no** se abandona: el motor lo reagenda más
 espaciado solo. Cuando vuelva, `suggested_difficulty` ya estará alta para mantener.
 
-**Ajuste en vivo (configurable):** `get_review_plan` trae `settings.adaptive_difficulty`.
-- `true` (por defecto): dentro de la misma sesión podés subir o bajar el nivel
-  según cómo vaya respondiendo — si clava dos seguidos, subí; si tropieza, bajá.
-  Arrancá siempre en `suggested_difficulty` y movete desde ahí.
-- `false`: mantené el subtema entero en `suggested_difficulty`, sin escalar en vivo.
+**Ajuste en vivo (configurable):** `get_review_plan` trae `settings.adaptive_difficulty`
+y `settings.difficulty_pace`.
+- `adaptive_difficulty: true` (por defecto): dentro de la misma sesión subí o bajá
+  el nivel según cómo vaya respondiendo. Arrancá siempre en `suggested_difficulty`
+  y movete desde ahí, según el ritmo:
+  - `suave`: subí solo tras **3** ejercicios seguidos ≥4; bajá ante cualquier tropiezo (<3).
+  - `normal` (default): subí tras **2** seguidos ≥4; bajá si baja de 3.
+  - `exigente`: subí con **1** solo ≥4.5; tolerá más antes de bajar (solo si <2.5).
+- `adaptive_difficulty: false`: mantené el subtema entero en `suggested_difficulty`,
+  sin escalar en vivo (el ritmo se ignora).
 
-En ambos casos, al guardar pasá en `difficulty` el nivel que **realmente** usaste.
+En todos los casos, al guardar pasá en `difficulty` el nivel que **realmente** usaste.
 
 ---
 

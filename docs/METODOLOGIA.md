@@ -101,7 +101,9 @@ Si no hay candidato, cae a un tercer topic urgente en formato quick.
 El topic con más días sin un recall completo (con al menos 1 recall previo). Formato: **recall completo** — recall libre de todo el topic, alimenta SM-2. Es el primero en recortarse si la sesión se acorta.
 
 ### Dificultad adaptativa (`adaptive_difficulty`, default `true`)
-Preferencia **blanda**: el servidor no la impone, la **expone** en `get_review_plan` (`settings.adaptive_difficulty`) para que el tutor la honre. Cuando está activa, el tutor micro-ajusta el nivel de los ejercicios **dentro** de la sesión (escalera alrededor de `suggested_difficulty`) en vez de mantener un solo nivel; cuando está inactiva, mantiene `suggested_difficulty`. Relevante sobre todo para práctica procedimental (mate). La progresión **entre sesiones** (`suggestDifficulty`) siempre aplica e fija el nivel de arranque.
+Preferencia **blanda**: el servidor no la impone, la **expone** en `get_review_plan` (`settings.adaptive_difficulty` + `settings.difficulty_pace`) para que el tutor la honre. Cuando está activa, el tutor micro-ajusta el nivel de los ejercicios **dentro** de la sesión (escalera alrededor de `suggested_difficulty`) en vez de mantener un solo nivel; cuando está inactiva, mantiene `suggested_difficulty`. Relevante sobre todo para práctica procedimental (mate). La progresión **entre sesiones** (`suggestDifficulty`) siempre aplica y fija el nivel de arranque.
+
+El **ritmo** (`difficulty_pace`: `suave`/`normal`/`exigente`, default `normal`) modula qué tan rápido escala esa escalera en vivo: `suave` sube tras 3 aciertos seguidos y baja ante cualquier tropiezo; `normal` sube tras 2 y baja con score <3; `exigente` sube con 1 acierto ≥4.5 y tolera más antes de bajar. Es también blando (lo interpreta el tutor); **no** altera la regla entre-sesiones de `suggestDifficulty`.
 
 ---
 

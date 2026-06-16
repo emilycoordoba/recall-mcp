@@ -126,6 +126,12 @@ export interface UserSettings {
   // server only surfaces the flag in get_review_plan; the model honors it. Mainly
   // relevant for procedural practice (math). See lib/difficulty.ts.
   adaptive_difficulty: boolean;
+  // How aggressively the live staircase (when adaptive_difficulty is on) raises or
+  // lowers the level: "suave" rises slowly and drops on any stumble, "normal" is
+  // the balanced default, "exigente" rises fast and tolerates more before dropping.
+  // Soft preference — surfaced in get_review_plan for the tutor to honor; the
+  // between-session suggested_difficulty engine (suggestDifficulty) is unaffected.
+  difficulty_pace: "suave" | "normal" | "exigente";
   // IANA timezone (e.g. "America/Mexico_City") in which this user's days are
   // computed: streak buckets, SM-2 "today"/days_overdue, and the day headers in
   // the dashboard. Auto-detected from the browser on the first authenticated
@@ -144,6 +150,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   review_only_practiced: true,
   review_slots: 4,
   adaptive_difficulty: true,
+  difficulty_pace: "normal",
   timezone: DEFAULT_TIMEZONE,
 };
 
@@ -1046,8 +1053,8 @@ export async function getReviewPlan(
   new_topics: NewTopic[];
   // Active preferences the model should honor this session (the soft, AI-
   // interpreted ones). Structural prefs like review_slots are already applied
-  // server-side; adaptive_difficulty is surfaced here for the tutor to read.
-  settings?: { adaptive_difficulty: boolean };
+  // server-side; these are surfaced here for the tutor to read.
+  settings?: { adaptive_difficulty: boolean; difficulty_pace: UserSettings["difficulty_pace"] };
 }> {
   const [allCandidates, { data: recentSlotRows }, settings] = await Promise.all([
     getReviewCandidates(userId, groupName),
@@ -1289,7 +1296,10 @@ export async function getReviewPlan(
     slots,
     session_id,
     new_topics: newTopics,
-    settings: { adaptive_difficulty: settings.adaptive_difficulty ?? DEFAULT_SETTINGS.adaptive_difficulty },
+    settings: {
+      adaptive_difficulty: settings.adaptive_difficulty ?? DEFAULT_SETTINGS.adaptive_difficulty,
+      difficulty_pace: settings.difficulty_pace ?? DEFAULT_SETTINGS.difficulty_pace,
+    },
   };
 }
 
