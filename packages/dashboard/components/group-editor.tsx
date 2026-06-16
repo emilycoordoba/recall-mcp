@@ -59,7 +59,7 @@ export function GroupCombobox({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-0.5 rounded border border-dashed border-muted-foreground/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground disabled:opacity-50"
+        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-muted-foreground/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground disabled:opacity-50"
       >
         <IconPlus className="size-3" />
         grupo
@@ -80,7 +80,7 @@ export function GroupCombobox({
               }
               if (e.key === "Escape") { setOpen(false); setQuery("") }
             }}
-            className="mb-1 w-full rounded border border-input bg-background px-1.5 py-1 text-xs outline-none focus:ring-2 focus:ring-ring/30"
+            className="mb-1 w-full rounded-md border border-input bg-background px-1.5 py-1 text-xs outline-none focus:ring-2 focus:ring-ring/30"
           />
           <div className="max-h-44 overflow-y-auto">
             {candidates.map((g) => (
@@ -88,7 +88,7 @@ export function GroupCombobox({
                 key={g.id}
                 type="button"
                 onClick={() => pick(g.name)}
-                className="block w-full truncate rounded px-1.5 py-1 text-left text-xs hover:bg-accent"
+                className="block w-full truncate rounded-sm px-1.5 py-1 text-left text-xs hover:bg-accent"
               >
                 {g.name}
               </button>
@@ -97,7 +97,7 @@ export function GroupCombobox({
               <button
                 type="button"
                 onClick={() => pick(query)}
-                className="block w-full truncate rounded px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-accent"
+                className="block w-full truncate rounded-sm px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-accent"
               >
                 + Crear «{query.trim()}»
               </button>

@@ -41,7 +41,7 @@ export function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
           ) : (
             <Badge variant="secondary" className="flex items-center gap-1 text-xs w-fit">
               <IconBolt className="h-3 w-3" />
-              Quick
+              Rápido
             </Badge>
           )}
         </div>

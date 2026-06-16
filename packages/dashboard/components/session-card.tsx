@@ -25,7 +25,7 @@ function FormatBadge({ format }: { format: ReviewSessionEntry["slots"][number]["
   if (format === "quick")
     return (
       <Badge variant="secondary" className="flex items-center gap-1 text-xs w-fit shrink-0">
-        <IconBolt className="h-3 w-3" />Quick
+        <IconBolt className="h-3 w-3" />Rápido
       </Badge>
     )
   if (format === "recall_dirigido")

@@ -59,11 +59,11 @@ export default async function TopicPage({
         quickReviewCount={quickReviews.length}
       />
 
-      {/* Subsections */}
+      {/* Subsecciones */}
       {subsections.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Subsections</CardTitle>
+            <CardTitle className="text-sm font-medium">Subsecciones</CardTitle>
           </CardHeader>
           <CardContent>
             <SubsectionList subsections={subsections} />
