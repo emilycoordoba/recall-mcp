@@ -8,6 +8,12 @@ const nextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  // La página /prompt lee los .md de system prompt con fs en runtime. Next solo
+  // empaqueta archivos que detecta por import, así que hay que incluirlos a mano
+  // para que no falten en la función de Vercel (ENOENT en producción).
+  outputFileTracingIncludes: {
+    "/prompt": ["./SYSTEM_PROMPT.md", "./SYSTEM_PROMPT_MATE.md"],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

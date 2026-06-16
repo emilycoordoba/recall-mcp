@@ -24,6 +24,7 @@ Desde la raíz del monorepo: `npm run dev:dashboard` / `npm run start:dashboard`
 | `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
 | `/settings` | Ajustes por usuario (p.ej. "repaso solo con temas estrenados"). |
+| `/prompt` | Muestra las plantillas de system prompt (general/mate) para copiar a Claude Desktop. Estático (sin DB); contenido leído de los `.md` de la raíz. |
 | `/login` · `/signup` | Auth del dashboard (Supabase Auth, email+contraseña). `/signup` crea auth user + fila `users` + `mcp_token`. Logout en `/auth/signout` (POST). |
 | `/authorize` · `/api/oauth/*` | Flujo OAuth para que Claude Desktop obtenga su Bearer token; valida con Supabase Auth (email+contraseña). |
 | `/api/topics/[id]` | `PATCH` (nombre/descripción) · `DELETE` (borrar topic) · `GET`. |
@@ -56,7 +57,10 @@ components/topic-detail-header.tsx — header editable del detalle (nombre, desc
 components/subsection-list.tsx — renombrar subsecciones inline
 components/topic-sessions.tsx  — historial; borrar recall y editar su feedback
 components/settings-form.tsx   — toggle de ajustes por usuario
-components/app-header.tsx      — AppHeader: nav común (marca + links + salir) en todas las páginas
+components/app-header.tsx      — AppHeader: nav común (marca + links + salir + toggle de tema) en todas las páginas
+components/theme-toggle.tsx    — toggle claro/oscuro (island; next-themes); en el AppHeader
+components/prompt-viewer.tsx   — /prompt: selector de plantilla + copiar (defensivo con clipboard)
+lib/prompts.ts                 — registro de plantillas de system prompt (id→.md) + loader fs
 components/logo.tsx            — LogoMark + Logo (marca "Recall"); favicon en app/icon.svg
 components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza confirm() nativo)
 components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error()/toast.success()

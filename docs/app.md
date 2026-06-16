@@ -200,6 +200,7 @@ Rutas disponibles:
 | `/topics/[id]` | Detalle: subsecciones, historial de recalls con breakdown por subsección |
 | `/sessions` | Sesiones de repaso agrupadas por día, con los 4 slots y scores por slot |
 | `/history` | Historial cronológico de todas las sesiones (recalls y quick reviews) |
+| `/prompt` | Muestra las plantillas de system prompt para copiar a Claude Desktop (ver + copiar + elegir plantilla) |
 
 El dashboard solo lee de Supabase — nunca escribe.
 
@@ -216,7 +217,11 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
   utilidades del token (`rounded-md`, `rounded-sm`, `rounded-lg`).
 - **Feedback in-app** (no `alert()`/`confirm()` nativos):
   - **Toasts** con `sonner` → `components/ui/sonner.tsx` (`<Toaster />`, tema
-    sincronizado a `next-themes`). Para errores: `toast.error(msg)`.
+      sincronizado a `next-themes`). Para errores: `toast.error(msg)`.
+- **Modo claro/oscuro**: `next-themes` con `attribute="class"` y `defaultTheme="system"`
+  (`components/theme-provider.tsx`); los tokens `.dark` viven en `globals.css`. El
+  control visible es `components/theme-toggle.tsx` (island cliente sol/luna en el
+  `AppHeader`, con guard de hidratación `mounted`); además sigue el atajo `d`.
   - **Confirmaciones** con `components/confirm-dialog.tsx`: `<ConfirmProvider>`
     (montado en `app/layout.tsx`) + hook `useConfirm()` promise-based sobre Radix
     AlertDialog. Patrón en el call site: `if (!(await confirm({ title, … }))) return`.
@@ -227,9 +232,15 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
   `title.template = "%s · Recall"` y `default = "Recall"`; cada página exporta su
   propio `title` (o `generateMetadata` con el nombre del tema en `/topics/[id]`).
 - **Navegación**: header común `components/app-header.tsx` (`<AppHeader>`) en todas
-  las páginas — marca (link al inicio) + nav (Sesiones/Historial/Ajustes/Salir) +
-  racha opcional. Unifica los tres patrones previos (nav completa, "← Dashboard",
-  "Volver"). `BackButton` queda solo para el detalle de tema.
+  las páginas — marca (link al inicio) + nav (Sesiones/Historial/Prompt/Ajustes/Salir)
+  + toggle de tema (`ThemeToggle`) + racha opcional. Unifica los tres patrones previos
+  (nav completa, "← Dashboard", "Volver"). `BackButton` queda solo para el detalle de tema.
+- **System prompt**: `/prompt` (`app/prompt/page.tsx`) muestra las plantillas de
+  system prompt para copiar a Claude Desktop. El contenido es la única fuente de
+  verdad en los `.md` de la raíz del paquete; `lib/prompts.ts` mapea `id → archivo`
+  y los lee con `fs` (empaquetados vía `outputFileTracingIncludes` en `next.config.mjs`).
+  `components/prompt-viewer.tsx` es el island con selector + copiar (defensivo:
+  `navigator.clipboard` solo existe en contexto seguro, avisa por toast si no).
 - **Responsive**: la lista de temas usa **tabla en ≥md y tarjetas apiladas en <md**
   (`MobileTopicCard` en `dashboard-filters.tsx`, misma lógica que la fila; las
   acciones de fila se muestran siempre en móvil vía `RowActions alwaysVisible`). El

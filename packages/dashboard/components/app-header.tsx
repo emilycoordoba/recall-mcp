@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 const NAV = [
   { href: "/sessions", label: "Sesiones" },
   { href: "/history", label: "Historial" },
+  { href: "/prompt", label: "Prompt" },
   { href: "/settings", label: "Ajustes" },
 ]
 
