@@ -1,7 +1,7 @@
-import Link from "next/link"
 import { getReviewSessions, getUserTimezone } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { SessionCard } from "@/components/session-card"
+import { AppHeader } from "@/components/app-header"
 import { dayInTz, formatDayLabel } from "@/lib/dates"
 
 export const metadata = { title: "Sesiones" }
@@ -20,16 +20,12 @@ export default async function SessionsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sesiones de repaso</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {sessions.length} sesiones registradas
-          </p>
-        </div>
-        <Link href="/" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-          ← Dashboard
-        </Link>
+      <AppHeader />
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Sesiones de repaso</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {sessions.length} sesiones registradas
+        </p>
       </div>
 
       {sessions.length === 0 ? (

@@ -1,10 +1,8 @@
-import Link from "next/link"
 import { getTopics, getStudyStreak, getGroups, getUserTimezone, type TopicRow } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
 import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
-import { Logo } from "@/components/logo"
-import { LogoutButton } from "@/components/logout-button"
+import { AppHeader } from "@/components/app-header"
 import { TimezoneSync } from "@/components/timezone-sync"
 
 function groupStats(topics: TopicRow[]): GroupStat[] {
@@ -46,31 +44,10 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <TimezoneSync stored={tz} />
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <Logo />
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            {topics.length} {topics.length === 1 ? "tema" : "temas"} · {groups.length} {groups.length === 1 ? "grupo" : "grupos"}
-          </p>
-        </div>
-        <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          {streak > 0 && (
-            <span className="text-sm font-medium text-orange-500">
-              🔥 {streak} {streak === 1 ? "día" : "días"}
-            </span>
-          )}
-          <Link href="/sessions" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Sesiones
-          </Link>
-          <Link href="/history" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Historial
-          </Link>
-          <Link href="/settings" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Ajustes
-          </Link>
-          <LogoutButton />
-        </nav>
-      </div>
+      <AppHeader streak={streak} />
+      <p className="-mt-4 mb-8 text-sm text-muted-foreground">
+        {topics.length} {topics.length === 1 ? "tema" : "temas"} · {groups.length} {groups.length === 1 ? "grupo" : "grupos"}
+      </p>
 
       <GroupStatCards stats={stats} />
 
