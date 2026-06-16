@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/app-header"
+import { BackButton } from "@/components/back-button"
 import { Skeleton } from "@/components/ui/skeleton"
 
 // Skeleton de /settings: título + descripción + la card de ajustes con su toggle.
@@ -6,6 +7,7 @@ export default function Loading() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-10" aria-busy="true" aria-label="Cargando">
       <AppHeader />
+      <BackButton />
       <Skeleton className="h-7 w-32" />
       <Skeleton className="mt-3 h-4 w-full max-w-md" />
       <Skeleton className="mt-1.5 mb-6 h-4 w-3/4 max-w-sm" />

@@ -2,6 +2,7 @@ import { getHistory, getUserTimezone } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { HistoryEntryRow } from "@/components/history-entry"
 import { AppHeader } from "@/components/app-header"
+import { BackButton } from "@/components/back-button"
 import { dayInTz, formatDayLabel } from "@/lib/dates"
 
 export const metadata = { title: "Historial" }
@@ -22,6 +23,7 @@ export default async function HistoryPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
       <AppHeader />
+      <BackButton />
       <div className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Historial</h1>
         <p className="mt-1 text-sm text-muted-foreground">
