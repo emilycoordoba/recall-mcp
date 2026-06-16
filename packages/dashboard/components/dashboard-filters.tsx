@@ -35,11 +35,11 @@ function isProcedural(t: TopicRow) {
 
 type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc" | "overdue_desc" | "overdue_asc"
 
-function formatDate(iso: string | null) {
+function formatDate(iso: string | null, tz: string) {
   if (!iso) return "—"
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
+  return d.toLocaleDateString("es-ES", { timeZone: tz, day: "2-digit", month: "short", year: "numeric" })
 }
 
 function daysSince(iso: string | null): number | null {
@@ -255,9 +255,10 @@ interface Props {
   topics: TopicRow[]
   groups: string[]
   allGroups: GroupRef[]
+  tz: string
 }
 
-export function DashboardFilters({ topics, groups, allGroups }: Props) {
+export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [localTopics, setLocalTopics] = useState(topics)
@@ -622,7 +623,7 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(topic.last_recalled_at)}
+                      {formatDate(topic.last_recalled_at, tz)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {topic.total_recalls}

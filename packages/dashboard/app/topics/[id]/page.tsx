@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers, getGroups } from "@/lib/db"
+import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers, getGroups, getUserTimezone } from "@/lib/db"
 import { suggestDifficulty } from "@/lib/difficulty"
 import { currentUserId } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +9,18 @@ import { TopicDetailHeader } from "@/components/topic-detail-header"
 import { SubsectionList } from "@/components/subsection-list"
 
 export const revalidate = 30
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const topicId = parseInt(id, 10)
+  if (isNaN(topicId)) return { title: "Tema" }
+  const topic = await getTopic(topicId, await currentUserId())
+  return { title: topic?.name ?? "Tema" }
+}
 
 export default async function TopicPage({
   params,
@@ -20,12 +32,13 @@ export default async function TopicPage({
   if (isNaN(topicId)) notFound()
 
   const userId = await currentUserId()
-  const [topic, subsections, rawRecalls, rawQuickReviews, allGroups] = await Promise.all([
+  const [topic, subsections, rawRecalls, rawQuickReviews, allGroups, tz] = await Promise.all([
     getTopic(topicId, userId),
     getSubsectionStats(topicId, userId),
     getRecalls(topicId, userId),
     getQuickReviews(topicId, userId),
     getGroups(userId),
+    getUserTimezone(userId),
   ])
   if (!topic) notFound()
 
@@ -80,7 +93,7 @@ export default async function TopicPage({
         </Card>
       )}
 
-      <TopicSessions sessions={sessions} subsections={subsections} />
+      <TopicSessions sessions={sessions} subsections={subsections} tz={tz} />
     </div>
   )
 }

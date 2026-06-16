@@ -1,10 +1,23 @@
 import { getServerSupabase } from "./supabase-server";
 import { suggestDifficulty } from "./difficulty";
+import { DEFAULT_TIMEZONE, dayInTz, addDays } from "./dates";
 
 const RECENT_WINDOW = 5;
 
-function localDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// User's timezone for day-bucketing on the server (the Vercel process is UTC).
+// Resilient: if the settings column hasn't been migrated yet (42703), fall back
+// to the default so reads keep working. Mirrors getUserSettings in db-mcp.ts but
+// kept here so the read lib doesn't import the write lib.
+export async function getUserTimezone(userId: number): Promise<string> {
+  const supabase = await getServerSupabase();
+  const { data, error } = await supabase
+    .from("users")
+    .select("settings")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) return DEFAULT_TIMEZONE;
+  const tz = (data?.settings as { timezone?: string } | null)?.timezone;
+  return tz ?? DEFAULT_TIMEZONE;
 }
 
 // Mapa topic_id → grupos (muchos-a-muchos) para un conjunto de topics. Query
@@ -132,16 +145,17 @@ export async function getStudyStreak(userId: number): Promise<number> {
     supabase.from("quick_review_sessions").select("reviewed_at").eq("user_id", userId),
   ]);
 
+  const tz = await getUserTimezone(userId);
   const allDays = new Set([
-    ...(recalls ?? []).map((r) => localDateStr(new Date(r.recalled_at))),
-    ...(qrs ?? []).map((q) => localDateStr(new Date(q.reviewed_at))),
+    ...(recalls ?? []).map((r) => dayInTz(r.recalled_at, tz)),
+    ...(qrs ?? []).map((q) => dayInTz(q.reviewed_at, tz)),
   ]);
 
   let streak = 0;
-  const cur = new Date();
-  while (allDays.has(localDateStr(cur))) {
+  let cur = dayInTz(new Date(), tz);
+  while (allDays.has(cur)) {
     streak++;
-    cur.setDate(cur.getDate() - 1);
+    cur = addDays(cur, -1);
   }
   return streak;
 }
@@ -162,6 +176,10 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
   if (error) throw error;
 
   const groupsMap = await groupsByTopic((data ?? []).map((t) => t.id), userId);
+
+  // "Today" in the user's zone, computed once (drives days_overdue per topic).
+  const tz = await getUserTimezone(userId);
+  const todayIso = dayInTz(new Date(), tz);
 
   return (data ?? []).map((t) => {
     const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
@@ -248,7 +266,6 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
     const next_review_date = lastRecallIso
       ? new Date(new Date(lastRecallIso).getTime() + sm2Interval * 86_400_000).toISOString().slice(0, 10)
       : null;
-    const todayIso = localDateStr(new Date());
     const days_overdue = next_review_date
       ? Math.round((Date.parse(todayIso) - Date.parse(next_review_date)) / 86_400_000)
       : null;

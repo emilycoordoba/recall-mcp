@@ -127,6 +127,33 @@ EF_nuevo = EF + 0.1 − (5 − score) × (0.08 + (5 − score) × 0.02)
 
 ---
 
+## Zonas horarias
+
+El dashboard corre como funciones serverless en Vercel, cuyo proceso usa `TZ=UTC`.
+Por eso **todo cálculo de "qué día es" debe hacerse en la zona del usuario, no en la
+del servidor**. La zona se guarda por usuario en `users.settings.timezone` (jsonb) y
+se **auto-detecta** del navegador en la primera visita autenticada
+(`components/timezone-sync.tsx` → `PATCH /api/settings`). Hasta entonces aplica
+`DEFAULT_TIMEZONE` (`lib/dates.ts`); el MCP, que no tiene navegador, también usa ese
+default si la zona aún no se capturó.
+
+Helpers en `lib/dates.ts` (puros, sirven en servidor y cliente):
+
+| Helper | Para qué |
+|---|---|
+| `dayInTz(instant, tz)` | Día calendario `YYYY-MM-DD` de un instante visto en `tz` (vía `Intl`, robusto a horario de verano) |
+| `addDays(day, delta)` | Avanza/retrocede un string `YYYY-MM-DD` en días (aritmética en UTC) |
+| `timeInTz(instant, tz)` | Hora `HH:MM` en `tz`; el servidor y el cliente formatean igual → sin *hydration mismatch* |
+| `formatDayLabel(day)` | Etiqueta humana ("lunes, 16 de junio de 2026") de un día ya resuelto |
+
+Puntos que dependen de la zona (todos arreglados para usar la del usuario): racha de
+días (`getStudyStreak`, `get_stats`), `days_overdue` / "hoy" de SM-2, y la agrupación
++ encabezados de día en `/history` y `/sessions`. **Antes** se usaba
+`new Date().getDate()` / `iso.slice(0,10)`, que en el servidor daba la fecha UTC → una
+sesión de la noche caía en el día siguiente y la racha se rompía cerca de medianoche.
+
+---
+
 ## MCP tools
 
 | Tool | Cuándo se llama |

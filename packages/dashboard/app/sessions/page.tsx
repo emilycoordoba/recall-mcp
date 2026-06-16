@@ -1,23 +1,19 @@
 import Link from "next/link"
-import { getReviewSessions } from "@/lib/db"
+import { getReviewSessions, getUserTimezone } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { SessionCard } from "@/components/session-card"
+import { dayInTz, formatDayLabel } from "@/lib/dates"
 
-function formatDay(iso: string) {
-  return new Date(iso).toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
-}
+export const metadata = { title: "Sesiones" }
 
 export default async function SessionsPage() {
-  const sessions = await getReviewSessions(await currentUserId())
+  const userId = await currentUserId()
+  const [sessions, tz] = await Promise.all([getReviewSessions(userId), getUserTimezone(userId)])
 
+  // Bucket by the user's local day, not the UTC date inside started_at.
   const byDay = new Map<string, typeof sessions>()
   for (const s of sessions) {
-    const day = s.started_at.slice(0, 10)
+    const day = dayInTz(s.started_at, tz)
     if (!byDay.has(day)) byDay.set(day, [])
     byDay.get(day)!.push(s)
   }
@@ -43,11 +39,11 @@ export default async function SessionsPage() {
           {Array.from(byDay.entries()).map(([day, daySessions]) => (
             <div key={day}>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground capitalize">
-                {formatDay(day)}
+                {formatDayLabel(day)}
               </h2>
               <div className="space-y-3">
                 {daySessions.map((session) => (
-                  <SessionCard key={session.id} session={session} />
+                  <SessionCard key={session.id} session={session} tz={tz} />
                 ))}
               </div>
             </div>
