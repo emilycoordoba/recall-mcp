@@ -58,14 +58,19 @@ components/topic-sessions.tsx  — historial; borrar recall y editar su feedback
 components/settings-form.tsx   — toggle de ajustes por usuario
 components/logo.tsx            — LogoMark + Logo (marca "Recall"); favicon en app/icon.svg
 components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza confirm() nativo)
-components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error() en vez de alert()
+components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error()/toast.success()
 components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table)
+app/manifest.ts               — Web App Manifest (PWA instalable; iconos en public/ + app/apple-icon.png)
+app/loading.tsx · app/error.tsx — skeleton de Suspense y error boundary de ruta (toda la app)
 ```
 
 **Sistema visual**: lenguaje "redondeado y cálido". Radio = un solo token
 `--radius` en `globals.css` (Tailwind v4 deriva sm/md/lg); no hardcodear radios
-fijos. Feedback in-app (no `alert`/`confirm` nativos): `toast.error()` y
-`await confirm({…})` vía `useConfirm()`. UI en español. Ver `docs/app.md` → "Sistema visual".
+fijos. Feedback in-app (no `alert`/`confirm` nativos): `toast.error()`/`toast.success()`
+y `await confirm({…})` vía `useConfirm()`. UI en español (`lang="es"`). Metadata con
+`title` template "%s · Recall" en `app/layout.tsx`. **Responsive**: lista de temas
+en tabla (≥md) o tarjetas (<md, `MobileTopicCard`). **PWA** instalable vía
+`app/manifest.ts` (sin offline). Ver `docs/app.md` → "Sistema visual".
 
 ## Gotchas
 

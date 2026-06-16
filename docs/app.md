@@ -222,7 +222,20 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
     AlertDialog. Patrón en el call site: `if (!(await confirm({ title, … }))) return`.
 - **Idioma**: toda la UI visible está en español (los términos de dominio
   "recall"/"quick review"→"repaso rápido" y los préstamos "feedback"/"email" se
-  mantienen).
+  mantienen). El documento declara `lang="es"`.
+- **Título de pestaña / metadata**: `app/layout.tsx` define `metadata` con
+  `title.template = "%s · Recall"` y `default = "Recall"`; cada página exporta su
+  propio `title` (o `generateMetadata` con el nombre del tema en `/topics/[id]`).
+- **Responsive**: la lista de temas usa **tabla en ≥md y tarjetas apiladas en <md**
+  (`MobileTopicCard` en `dashboard-filters.tsx`, misma lógica que la fila; las
+  acciones de fila se muestran siempre en móvil vía `RowActions alwaysVisible`). El
+  header del home apila en móvil.
+- **PWA instalable**: `app/manifest.ts` (display standalone, `lang=es`) + iconos en
+  `public/icon-{192,512}.png` (any) e `icon-maskable-512.png` (maskable, fondo +
+  padding) + `app/apple-icon.png`. Instalable en el teléfono; **sin** modo offline
+  (no hay service worker).
+- **Estados de ruta**: `app/loading.tsx` (skeleton de Suspense con la marca) y
+  `app/error.tsx` (error boundary con botón Reintentar; Client Component).
 
 ### Columna "Próxima"
 
