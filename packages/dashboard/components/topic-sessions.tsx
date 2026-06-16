@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { IconCheck, IconX, IconBolt, IconTrash } from "@tabler/icons-react"
+import { DifficultyBadge } from "@/components/difficulty-badge"
 import { useConfirm } from "@/components/confirm-dialog"
 
 function formatDate(iso: string) {
@@ -80,6 +81,7 @@ interface QuickSession {
     id: number
     overall_score: number | null
     feedback: string | null
+    difficulty: number | null
     answers: QuickAnswer[]
   }
 }
@@ -324,6 +326,12 @@ export function TopicSessions({ sessions, subsections }: Props) {
                         <IconBolt className="h-3 w-3" />
                         Repaso rápido
                       </Badge>
+                      {session.data.difficulty !== null && (
+                        <DifficultyBadge
+                          level={session.data.difficulty}
+                          title={`Ejercicios planteados a dificultad ${session.data.difficulty}/5`}
+                        />
+                      )}
                     </div>
                     <ScoreBadge score={session.data.overall_score} />
                   </div>

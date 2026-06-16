@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { IconTrash } from "@tabler/icons-react"
 import { TopicGroups, type GroupRef } from "@/components/topic-groups"
+import { DifficultyBadge } from "@/components/difficulty-badge"
 import { useConfirm } from "@/components/confirm-dialog"
 
 interface Topic {
@@ -20,11 +21,15 @@ export function TopicDetailHeader({
   allGroups,
   recallCount,
   quickReviewCount,
+  difficulty,
 }: {
   topic: Topic
   allGroups: GroupRef[]
   recallCount: number
   quickReviewCount: number
+  // Solo presente para topics de práctica procedimental (mate). last = nivel
+  // actual (null si nunca se registró); suggested = el sugerido para la próxima.
+  difficulty?: { last: number | null; suggested: number }
 }) {
   const router = useRouter()
   const confirm = useConfirm()
@@ -175,9 +180,28 @@ export function TopicDetailHeader({
         </button>
       )}
 
-      <p className="mt-1 text-xs text-muted-foreground">
-        {recallCount} recall{recallCount !== 1 ? "s" : ""} · {quickReviewCount} repaso{quickReviewCount !== 1 ? "s" : ""} rápido{quickReviewCount !== 1 ? "s" : ""}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <p className="text-xs text-muted-foreground">
+          {recallCount} recall{recallCount !== 1 ? "s" : ""} · {quickReviewCount} repaso{quickReviewCount !== 1 ? "s" : ""} rápido{quickReviewCount !== 1 ? "s" : ""}
+        </p>
+        {difficulty && (
+          <span className="inline-flex items-center gap-1.5">
+            <DifficultyBadge
+              level={difficulty.last ?? difficulty.suggested}
+              title={
+                difficulty.last === null
+                  ? `Dificultad sugerida ${difficulty.suggested}/5 (aún sin registrar)`
+                  : `Dificultad actual ${difficulty.last}/5`
+              }
+            />
+            {difficulty.last !== null && difficulty.suggested !== difficulty.last && (
+              <span className="text-xs text-muted-foreground">
+                próxima sugerida: {difficulty.suggested}/5
+              </span>
+            )}
+          </span>
+        )}
+      </div>
     </div>
   )
 }

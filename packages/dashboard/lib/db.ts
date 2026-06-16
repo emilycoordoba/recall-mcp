@@ -1,4 +1,5 @@
 import { getServerSupabase } from "./supabase-server";
+import { suggestDifficulty } from "./difficulty";
 
 const RECENT_WINDOW = 5;
 
@@ -65,6 +66,10 @@ export interface TopicRow {
   effective_score: number | null;
   next_review_date: string | null;
   days_overdue: number | null;
+  // Práctica procedimental (mate): nivel actual usado y el sugerido para la
+  // próxima sesión. Solo relevante para topics de quick review; ver isProcedural.
+  last_difficulty: number | null;
+  suggested_difficulty: number;
 }
 
 export interface TopicDetail {
@@ -107,6 +112,7 @@ export interface QuickReviewRow {
   reviewed_at: string;
   overall_score: number | null;
   feedback: string | null;
+  difficulty: number | null;
 }
 
 export interface QuickReviewAnswerRow {
@@ -148,7 +154,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       id, name, description, created_at, group_id,
       topic_groups!topics_group_id_fkey(name),
       recalls(overall_score, recalled_at, format),
-      quick_review_sessions(reviewed_at, overall_score)
+      quick_review_sessions(reviewed_at, overall_score, difficulty)
     `)
     .eq("user_id", userId)
     .order("name");
@@ -159,7 +165,14 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
 
   return (data ?? []).map((t) => {
     const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
-    const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number }[]) ?? [];
+    const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number; difficulty: number | null }[]) ?? [];
+
+    // Procedural-practice difficulty (math): reconstruct from quick reviews, newest first.
+    const { last: last_difficulty, suggested: suggested_difficulty } = suggestDifficulty(
+      [...qrs]
+        .sort((a, b) => b.reviewed_at.localeCompare(a.reviewed_at))
+        .map((q) => ({ score: q.overall_score, difficulty: q.difficulty ?? null })),
+    );
 
     // All sessions sorted most recent first
     const allSessions = [
@@ -273,6 +286,8 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       effective_score,
       next_review_date,
       days_overdue,
+      last_difficulty,
+      suggested_difficulty,
     };
   });
 }
@@ -445,7 +460,7 @@ export async function getQuickReviews(topicId: number, userId: number): Promise<
   const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("quick_review_sessions")
-    .select("id, topic_id, reviewed_at, overall_score, feedback")
+    .select("id, topic_id, reviewed_at, overall_score, feedback, difficulty")
     .eq("topic_id", topicId)
     .eq("user_id", userId)
     .order("reviewed_at", { ascending: false });

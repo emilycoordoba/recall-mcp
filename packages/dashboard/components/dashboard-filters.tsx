@@ -24,7 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { GroupChips, GroupCombobox, type GroupRef } from "@/components/group-editor"
+import { DifficultyBadge } from "@/components/difficulty-badge"
 import type { TopicRow } from "@/lib/db"
+
+// Práctica procedimental (mate): solo estos topics usan dificultad. Misma
+// condición que el motor SM-2 para elegir la escalera densa (solo quick reviews).
+function isProcedural(t: TopicRow) {
+  return t.total_quick_reviews > 0 && t.total_recalls === 0
+}
 
 type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc" | "overdue_desc" | "overdue_asc"
 
@@ -601,6 +608,18 @@ export function DashboardFilters({ topics, groups, allGroups }: Props) {
                         <RetentionBadge score={topic.last_score} effectiveScore={topic.effective_score} retention={topic.retention} />
                         <TrendIndicator trend={topic.score_trend} />
                       </span>
+                      {isProcedural(topic) && (
+                        <div className="mt-1 flex justify-center">
+                          <DifficultyBadge
+                            level={topic.last_difficulty ?? topic.suggested_difficulty}
+                            title={
+                              topic.last_difficulty === null
+                                ? `Dificultad sugerida ${topic.suggested_difficulty}/5 (aún sin registrar)`
+                                : `Dificultad actual ${topic.last_difficulty}/5 · próxima sugerida ${topic.suggested_difficulty}/5`
+                            }
+                          />
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDate(topic.last_recalled_at)}

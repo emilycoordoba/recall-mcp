@@ -1,6 +1,7 @@
 // El MCP usa el cliente service-role: SALTA RLS. El aislamiento se mantiene a
 // nivel app (`.eq("user_id", …)`) y el Bearer token ya scopea al usuario.
 import { supabaseAdmin as supabase } from "./supabase-admin";
+import { suggestDifficulty } from "./difficulty";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -375,28 +376,7 @@ interface CandidateRow {
   topic_subsections: CandidateSubRow[];
 }
 
-const clampDifficulty = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
-
-// Suggests the difficulty (1-5) for the *next* quick review of a topic, from the
-// docente's progression rules (originally prose in SYSTEM_PROMPT_MATE):
-//   - sin historial            → 2 (básico-medio)
-//   - última sesión score <3    → baja un nivel (vuelve a lo básico)
-//   - las dos últimas score ≥4  → sube un nivel (ya mecanizó, exígele más)
-//   - resto                     → se mantiene en la última dificultad usada
-// `sessions` = quick reviews del topic, MÁS RECIENTE PRIMERO. `difficulty` es null
-// para sesiones guardadas antes de trackearla (se trata como "sin nivel previo").
-// Único lugar que decide la progresión: ajustar umbrales aquí cambia el comportamiento.
-function suggestDifficulty(
-  sessions: { score: number; difficulty: number | null }[],
-): { last: number | null; suggested: number } {
-  const last = sessions.find((s) => s.difficulty != null)?.difficulty ?? null;
-  if (sessions.length === 0) return { last: null, suggested: 2 };
-  const base = last ?? 2;
-  const [s0, s1] = sessions;
-  if (s0.score < 3) return { last, suggested: clampDifficulty(base - 1) };
-  if (s1 && s0.score >= 4 && s1.score >= 4) return { last, suggested: clampDifficulty(base + 1) };
-  return { last, suggested: clampDifficulty(base) };
-}
+// suggestDifficulty vive en ./difficulty (compartido con db.ts).
 
 export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
   let query = supabase

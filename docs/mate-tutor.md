@@ -108,8 +108,12 @@ que se logró es ambiguo.
 - Sesiones viejas (difficulty NULL) se tratan como "sin nivel previo" → arrancan
   en 2 y la escalera se reconstruye desde la próxima sesión.
 
-Pendiente opcional: mostrar la dificultad en el dashboard (trayectoria por
-subtema). El motor y el prompt ya la usan.
+Dashboard (IMPLEMENTADO): la dificultad se muestra solo para topics
+procedimentales (`total_quick_reviews > 0 && total_recalls === 0`, mismo criterio
+que el motor): chip "Dif. N/5" en la lista principal (celda de puntaje), nivel
+actual + próxima sugerida en el header del detalle, y la dificultad por sesión en
+el historial (la trayectoria). Componente `DifficultyBadge`; `suggestDifficulty`
+se movió a `lib/difficulty.ts` (compartido por db.ts y db-mcp.ts).
 
 ## Tabla de contenido a cargar (grupo `matematica`)
 

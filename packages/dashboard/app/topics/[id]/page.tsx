@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers, getGroups } from "@/lib/db"
+import { suggestDifficulty } from "@/lib/difficulty"
 import { currentUserId } from "@/lib/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BackButton } from "@/components/back-button"
@@ -48,6 +49,13 @@ export default async function TopicPage({
     b.date.localeCompare(a.date)
   )
 
+  // Difficulty only applies to procedural practice (math): quick-review-only topics.
+  // rawQuickReviews is already newest-first (reviewed_at desc).
+  const isProcedural = recalls.length === 0 && quickReviews.length > 0
+  const difficulty = isProcedural
+    ? suggestDifficulty(rawQuickReviews.map((q) => ({ score: q.overall_score ?? 0, difficulty: q.difficulty })))
+    : undefined
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
       <BackButton />
@@ -57,6 +65,7 @@ export default async function TopicPage({
         allGroups={allGroups}
         recallCount={recalls.length}
         quickReviewCount={quickReviews.length}
+        difficulty={difficulty}
       />
 
       {/* Subsecciones */}
