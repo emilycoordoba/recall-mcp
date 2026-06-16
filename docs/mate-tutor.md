@@ -48,8 +48,12 @@ Adaptación del sistema de recall para práctica diaria de matemática de secund
     la **valida la mamá como docente**.
 - `mastered` por subsección = señal de "domina *todos* los casos del subtema" —
   crítico porque ella va a enseñar secundaria, no le basta con los casos fáciles.
-- El historial de dificultad y errores recurrentes vive **en el texto de
-  feedback** de cada sesión; Claude lo reconstruye leyendo `get_topic`.
+- La **dificultad es un dato** (`quick_review_sessions.difficulty`, 1-5): cada
+  sesión guarda el nivel realmente usado y `getReviewPlan` devuelve por slot
+  `last_difficulty` + `suggested_difficulty` (calculada server-side). Antes era
+  texto libre en el feedback y el modelo no la reconstruía bien (siempre media);
+  ver "Dificultad estructurada" abajo. Los **errores recurrentes** sí siguen en
+  el texto de feedback (Claude los lee con `get_topic`).
 
 ## No cubierto en fase 1 (honesto)
 
@@ -65,11 +69,11 @@ Acotados, casi todo cuelga del topic:
 
 | Campo | Tabla | Para qué |
 |---|---|---|
-| `current_difficulty` (1-5) | `topics` | Calibrar ejercicios y subir al dominar |
+| ~~`current_difficulty` (1-5)~~ | ~~`topics`~~ | ✅ Implementado distinto: `difficulty` por sesión (ver abajo) |
 | `common_errors` (texto) | `topics` | Errores recurrentes; priorizar el subtipo |
 | `exercises_total` / `exercises_correct` | `quick_review_sessions` | Score objetivo trazable |
 | `difficulty` del intento | `quick_review_answers` | Curva de progresión |
-| `user_id` | `topics`, `topic_groups` | Multiusuario |
+| `user_id` | `topics`, `topic_groups` | ✅ Implementado (multiusuario) |
 
 Cambio de lógica también pendiente: que las sesiones de ejercicios
 (`quick_review`) alimenten el intervalo SM-2 (hoy solo lo hace `format:"completo"`).
@@ -83,6 +87,29 @@ se calcula desde los `quick_review_sessions`. Escalera según tipo de práctica:
   `[1, 3, 7, 16]` luego `×EF`, reinicio 1 si falla (<3). Elegida por la docente.
 Sin esto, un topic de solo quick-review nunca avanzaba intervalo y el
 agendamiento era pura recencia (sin repetición espaciada real).
+
+## Dificultad estructurada (IMPLEMENTADO)
+
+**Problema:** la dificultad vivía como texto (`Dificultad: N/5`) en el feedback;
+el modelo debía escribirla, releerla con `get_topic` y parsearla. La cadena se
+rompía y siempre caía al default (media). Además un score sin la dificultad a la
+que se logró es ambiguo.
+
+**Solución** (migración `2026-06-15_quick-review-difficulty.sql`):
+- Columna `quick_review_sessions.difficulty` (smallint 1-5, nullable). Cada
+  `save_quick_review` guarda el nivel realmente usado (param `difficulty`).
+- `getReviewCandidates`/`getReviewPlan` calculan y devuelven por slot
+  `last_difficulty` (última usada, null si nunca) y `suggested_difficulty` (a qué
+  nivel plantear ahora). El modelo ya no estima: obedece el plan.
+- Regla de progresión (server-side, función `suggestDifficulty` en `db-mcp.ts` —
+  único lugar que decide; ajustar umbrales ahí): sin historial → 2; última <3 →
+  baja 1; las dos últimas ≥4 → sube 1; si no, mantiene. Clamp 1-5. Son las
+  reglas que la docente ya había fijado en el prompt, ahora ejecutadas por código.
+- Sesiones viejas (difficulty NULL) se tratan como "sin nivel previo" → arrancan
+  en 2 y la escalera se reconstruye desde la próxima sesión.
+
+Pendiente opcional: mostrar la dificultad en el dashboard (trayectoria por
+subtema). El motor y el prompt ya la usan.
 
 ## Tabla de contenido a cargar (grupo `matematica`)
 

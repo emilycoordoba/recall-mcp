@@ -96,7 +96,7 @@ export function createMcpServer(userId: number): McpServer {
 
   server.tool(
     "get_review_plan",
-    "Genera el plan de la sesión de repaso: slots con topic, formato (quick / recall_dirigido / recall_completo) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso. El campo `new_topics` lista temas que el usuario aún no ha estrenado (0 sesiones) y que por preferencia NO entran al repaso espaciado: no los incluyas en la sesión salvo que el usuario pida explícitamente estrenarlos; puedes mencionarlos al final como temas pendientes por practicar.",
+    "Genera el plan de la sesión de repaso: slots con topic, formato (quick / recall_dirigido / recall_completo) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso. Cada slot trae `suggested_difficulty` (1-5, ya calculado del historial de scores) y `last_difficulty` (la última usada): para práctica de mate, plantea los ejercicios a la dificultad sugerida — no la estimes — y pásala a save_quick_review. El campo `new_topics` lista temas que el usuario aún no ha estrenado (0 sesiones) y que por preferencia NO entran al repaso espaciado: no los incluyas en la sesión salvo que el usuario pida explícitamente estrenarlos; puedes mencionarlos al final como temas pendientes por practicar.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
       const plan = await getReviewPlan(userId, group_name);
@@ -189,6 +189,7 @@ export function createMcpServer(userId: number): McpServer {
       overall_score: z.number().min(0).max(5).describe("Score global (0.0–5.0)"),
       feedback:      z.string().optional().describe("Resumen general de la sesión (opcional)"),
       session_id:    z.number().int().optional().describe("ID de la sesión de repaso devuelto por get_review_plan. Pasar siempre en sesiones de repaso para trazabilidad."),
+      difficulty:    z.number().int().min(1).max(5).optional().describe("Dificultad (1-5) a la que se plantearon los ejercicios en esta sesión. Usar la que indicó get_review_plan (suggested_difficulty), ajustada si tuviste que subir/bajar en vivo. Alimenta la dificultad sugerida de la próxima sesión."),
       answers: z.array(z.object({
         subsection_name: z.string(),
         question:        z.string(),
@@ -211,6 +212,7 @@ export function createMcpServer(userId: number): McpServer {
             session_id: result.session_id,
             topic_id: result.topic_id,
             overall_score: input.overall_score,
+            difficulty: input.difficulty ?? null,
           }, null, 2),
         }],
       };

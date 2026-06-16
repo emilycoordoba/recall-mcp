@@ -40,6 +40,9 @@ export interface SaveQuickReviewInput {
   overall_score: number;
   feedback?: string;
   session_id?: number;
+  // Difficulty (1-5) the exercises were actually posed at this session. Drives
+  // next session's suggested_difficulty (see suggestDifficulty / getReviewPlan).
+  difficulty?: number;
   answers: QuickReviewAnswerInput[];
 }
 
@@ -71,6 +74,11 @@ export interface ReviewCandidate {
   next_review_date: string | null;
   days_overdue: number;
   sm2_interval: number;
+  // Difficulty (1-5) for procedural practice (math). last_difficulty = the level
+  // used in the most recent quick review that recorded one (null if never);
+  // suggested_difficulty = what to pose next, computed from recent scores.
+  last_difficulty: number | null;
+  suggested_difficulty: number;
   subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
 }
 
@@ -363,8 +371,31 @@ interface CandidateRow {
   name: string;
   topic_groups: { name: string } | null;
   recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[];
-  quick_review_sessions: { id: number; reviewed_at: string; overall_score: number }[];
+  quick_review_sessions: { id: number; reviewed_at: string; overall_score: number; difficulty: number | null }[];
   topic_subsections: CandidateSubRow[];
+}
+
+const clampDifficulty = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
+
+// Suggests the difficulty (1-5) for the *next* quick review of a topic, from the
+// docente's progression rules (originally prose in SYSTEM_PROMPT_MATE):
+//   - sin historial            → 2 (básico-medio)
+//   - última sesión score <3    → baja un nivel (vuelve a lo básico)
+//   - las dos últimas score ≥4  → sube un nivel (ya mecanizó, exígele más)
+//   - resto                     → se mantiene en la última dificultad usada
+// `sessions` = quick reviews del topic, MÁS RECIENTE PRIMERO. `difficulty` es null
+// para sesiones guardadas antes de trackearla (se trata como "sin nivel previo").
+// Único lugar que decide la progresión: ajustar umbrales aquí cambia el comportamiento.
+function suggestDifficulty(
+  sessions: { score: number; difficulty: number | null }[],
+): { last: number | null; suggested: number } {
+  const last = sessions.find((s) => s.difficulty != null)?.difficulty ?? null;
+  if (sessions.length === 0) return { last: null, suggested: 2 };
+  const base = last ?? 2;
+  const [s0, s1] = sessions;
+  if (s0.score < 3) return { last, suggested: clampDifficulty(base - 1) };
+  if (s1 && s0.score >= 4 && s1.score >= 4) return { last, suggested: clampDifficulty(base + 1) };
+  return { last, suggested: clampDifficulty(base) };
 }
 
 export async function getReviewCandidates(userId: number, groupName?: string): Promise<ReviewCandidate[]> {
@@ -374,7 +405,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       id, name,
       topic_groups!topics_group_id_fkey(name),
       recalls(id, recalled_at, overall_score, format),
-      quick_review_sessions(id, reviewed_at, overall_score),
+      quick_review_sessions(id, reviewed_at, overall_score, difficulty),
       topic_subsections(
         id, name,
         recall_subsections(recall_id, covered, score),
@@ -400,7 +431,15 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
   return ((data ?? []) as unknown as CandidateRow[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
-      const qrs: { id: number; reviewed_at: string; overall_score: number }[] = t.quick_review_sessions ?? [];
+      const qrs: { id: number; reviewed_at: string; overall_score: number; difficulty: number | null }[] = t.quick_review_sessions ?? [];
+
+      // Procedural-practice difficulty (math): reconstruct from quick reviews,
+      // newest first, so the plan can hand Claude a ready-computed next level.
+      const { last: last_difficulty, suggested: suggested_difficulty } = suggestDifficulty(
+        [...qrs]
+          .sort((a, b) => b.reviewed_at.localeCompare(a.reviewed_at))
+          .map((q) => ({ score: q.overall_score, difficulty: q.difficulty ?? null })),
+      );
 
       // Bug 2 fix: urgency uses only full recall dates; display uses any session date
       const sortedRecalls = [...recalls].sort((a, b) => b.recalled_at.localeCompare(a.recalled_at));
@@ -526,6 +565,8 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
         next_review_date: nextReviewDate,
         days_overdue: daysOverdue,
         sm2_interval: sm2Interval,
+        last_difficulty,
+        suggested_difficulty,
         subsections,
       };
     })
@@ -625,7 +666,7 @@ export async function saveQuickReview(input: SaveQuickReviewInput, userId: numbe
 
   const { data: session, error: se } = await supabase
     .from("quick_review_sessions")
-    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null })
+    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null, difficulty: input.difficulty ?? null })
     .select("id")
     .single();
   if (se) throw se;
@@ -964,6 +1005,9 @@ export interface ReviewSlot {
   days_since_full_recall: number | null;
   avg_score: number | null;
   total_recalls: number;
+  // Procedural practice (math): level last used and the level to pose now.
+  last_difficulty?: number | null;
+  suggested_difficulty?: number;
   target_subsection?: string;
   target_subsections?: string[];
   recent_questions?: string[];
@@ -1151,6 +1195,19 @@ export async function getReviewPlan(
       days_since_recall: s4.days_since_recall, days_since_full_recall: s4.days_since_full_recall,
       avg_score: s4.avg_score, total_recalls: s4.total_recalls,
     });
+  }
+
+  // Attach procedural-practice difficulty to each slot from its candidate, so we
+  // don't thread it through all the slot-building branches above.
+  const diffByTopic = new Map(
+    candidates.map((c) => [c.topic_id, { last: c.last_difficulty, suggested: c.suggested_difficulty }]),
+  );
+  for (const slot of slots) {
+    const d = diffByTopic.get(slot.topic_id);
+    if (d) {
+      slot.last_difficulty = d.last;
+      slot.suggested_difficulty = d.suggested;
+    }
   }
 
   // Persist the session for traceability and future cooldown calculations
