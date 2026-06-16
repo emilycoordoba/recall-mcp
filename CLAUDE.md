@@ -144,6 +144,9 @@ Variables de entorno necesarias:
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` — conexión a Supabase
 - `MCP_API_KEY` — token Bearer que usa Claude Desktop
 - `DASHBOARD_USER` / `DASHBOARD_PASS` — Basic auth para la UI
+- `OAUTH_ALLOWED_REDIRECT_HOSTS` *(opcional)* — hosts extra permitidos como
+  `redirect_uri` en el flujo OAuth (coma-separado). Por defecto se permiten
+  loopback + `claude.ai`/`claude.com`/`anthropic.com`. Ver `docs/track-d-auth.md` (D5).
 
 ## Gotchas
 

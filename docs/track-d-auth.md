@@ -91,6 +91,17 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
     `dashboard_pass` eliminada (tras deploy + snapshot). `dashboard_user` se
     conserva. `scripts/seed-auth-users.mjs` eliminado (quedó obsoleto).
     **Track D completo.**
+- **D5 — Hardening del open redirect (OAuth).** `/authorize` redirigía el
+  authorization code a cualquier `redirect_uri` sin validar; como el atacante
+  controla el par PKCE, PKCE no protegía → robo del token MCP de la víctima vía
+  open redirect. Fix: `isAllowedRedirectUri` (`lib/auth-shared.ts`) valida por
+  **host** (no hay clientes persistidos para validar URIs exactas): loopback
+  (Claude Desktop, cualquier puerto) + `claude.ai`/`claude.com`/`anthropic.com`
+  y subdominios (solo https), extensible por `OAUTH_ALLOWED_REDIRECT_HOSTS`.
+  `/authorize` rechaza con 400 antes de autenticar; `/token` además bindea
+  `redirect_uri`/`client_id` al code (lenient si el cliente los omite, defensa en
+  profundidad). `/register` (DCR abierto) se mantiene: con la allowlist en
+  `/authorize`, el registro abierto ya no siembra destinos de redirect.
 
 ## Tablas y scoping para RLS
 

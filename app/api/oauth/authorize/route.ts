@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import crypto from "crypto";
-import { getUserByAuthCreds } from "@/lib/auth-shared";
+import { getUserByAuthCreds, isAllowedRedirectUri } from "@/lib/auth-shared";
 
 function b64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
@@ -26,6 +26,16 @@ export async function POST(request: Request) {
   const clientId = body.get("client_id") ?? "";
   const state = body.get("state");
   const responseType = body.get("response_type");
+
+  // Validar redirect_uri ANTES de autenticar o redirigir: si no está en la
+  // allowlist, error directo (nunca redirigir a un destino no confiable). Cierra
+  // el open redirect que permitiría robar el authorization code de la víctima.
+  if (!redirectUri || !isAllowedRedirectUri(redirectUri)) {
+    return Response.json(
+      { error: "invalid_request", error_description: "redirect_uri not allowed" },
+      { status: 400 },
+    );
+  }
 
   // Reconstruct authorize URL to redirect back on error
   const authorizeParams = new URLSearchParams({

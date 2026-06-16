@@ -76,6 +76,21 @@ export async function POST(request: Request) {
       );
     }
 
+    // Defensa en profundidad (RFC 6749 §4.1.3): el code está ligado al
+    // redirect_uri y client_id con que se emitió. Si el cliente los manda, deben
+    // coincidir. Lenient si los omite (cliente público) para no romper el login.
+    const reqRedirect = body.get("redirect_uri");
+    const reqClient = body.get("client_id");
+    if (
+      (reqRedirect !== null && reqRedirect !== payload.ru) ||
+      (reqClient !== null && reqClient !== payload.ci)
+    ) {
+      return Response.json(
+        { error: "invalid_grant", error_description: "redirect_uri/client_id mismatch" },
+        { status: 400, headers: CORS },
+      );
+    }
+
     // Hand back the resolved user's own MCP token (per-user isolation).
     const uid = Number(payload.uid);
     const userToken = Number.isInteger(uid) ? await getMcpTokenByUserId(uid) : null;
