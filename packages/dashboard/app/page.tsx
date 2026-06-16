@@ -46,14 +46,14 @@ export default async function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
       <TimezoneSync stored={tz} />
-      <div className="mb-8 flex items-center justify-between gap-4">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Logo />
           <p className="mt-1.5 text-sm text-muted-foreground">
             {topics.length} {topics.length === 1 ? "tema" : "temas"} · {groups.length} {groups.length === 1 ? "grupo" : "grupos"}
           </p>
         </div>
-        <nav className="flex items-center gap-4">
+        <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {streak > 0 && (
             <span className="text-sm font-medium text-orange-500">
               🔥 {streak} {streak === 1 ? "día" : "días"}

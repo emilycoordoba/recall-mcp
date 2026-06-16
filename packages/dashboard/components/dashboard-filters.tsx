@@ -178,11 +178,15 @@ function RowActions({
   targets,
   onMerge,
   onDelete,
+  alwaysVisible = false,
 }: {
   topic: TopicRow
   targets: TopicRow[]
   onMerge: (sourceId: number, targetId: number) => Promise<void>
   onDelete: (id: number) => Promise<void>
+  // En la vista de tabla las acciones aparecen al hacer hover sobre la fila; en
+  // móvil (tarjetas) no hay hover, así que se muestran siempre.
+  alwaysVisible?: boolean
 }) {
   const confirm = useConfirm()
   const [merging, setMerging] = useState(false)
@@ -240,13 +244,94 @@ function RowActions({
   }
 
   return (
-    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity">
+    <div className={`flex items-center justify-end gap-0.5${alwaysVisible ? "" : " opacity-0 group-hover/row:opacity-100 transition-opacity"}`}>
       <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title="Fusionar con otro tema" onClick={() => setMerging(true)}>
         <IconArrowMerge className="size-3.5" />
       </Button>
       <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title="Borrar tema" onClick={remove}>
         <IconTrash className="size-3.5" />
       </Button>
+    </div>
+  )
+}
+
+// Vista de un tema en móvil: la misma información que una fila de la tabla, pero
+// apilada en una tarjeta legible con el pulgar (la tabla se oculta < md). Reusa
+// los mismos sub-componentes y handlers para no duplicar lógica.
+function MobileTopicCard({
+  topic,
+  selected,
+  onToggle,
+  onRename,
+  allGroups,
+  onAddGroup,
+  onRemoveGroup,
+  targets,
+  onMerge,
+  onDelete,
+  tz,
+}: {
+  topic: TopicRow
+  selected: boolean
+  onToggle: () => void
+  onRename: (id: number, newName: string) => Promise<void>
+  allGroups: GroupRef[]
+  onAddGroup: (name: string) => void
+  onRemoveGroup: (groupId: number) => void
+  targets: TopicRow[]
+  onMerge: (sourceId: number, targetId: number) => Promise<void>
+  onDelete: (id: number) => Promise<void>
+  tz: string
+}) {
+  return (
+    <div
+      data-state={selected ? "selected" : undefined}
+      className="rounded-lg ring-1 ring-border p-4 space-y-3 data-[state=selected]:bg-muted/40"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            aria-label={`Seleccionar ${topic.name}`}
+            className="mt-1 size-4 shrink-0 accent-primary"
+            checked={selected}
+            onChange={onToggle}
+          />
+          <div className="space-y-1.5">
+            <TopicNameCell topic={topic} onRename={onRename} />
+            <GroupChips
+              groups={topic.groups}
+              allGroups={allGroups}
+              onAdd={onAddGroup}
+              onRemove={(g) => onRemoveGroup(g.id)}
+            />
+          </div>
+        </div>
+        <RowActions topic={topic} targets={targets} onMerge={onMerge} onDelete={onDelete} alwaysVisible />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          Puntaje:
+          <RetentionBadge score={topic.last_score} effectiveScore={topic.effective_score} retention={topic.retention} />
+          <TrendIndicator trend={topic.score_trend} />
+        </span>
+        {isProcedural(topic) && (
+          <DifficultyBadge
+            level={topic.last_difficulty ?? topic.suggested_difficulty}
+            title={
+              topic.last_difficulty === null
+                ? `Dificultad sugerida ${topic.suggested_difficulty}/5 (aún sin registrar)`
+                : `Dificultad actual ${topic.last_difficulty}/5 · próxima sugerida ${topic.suggested_difficulty}/5`
+            }
+          />
+        )}
+        <span>Último: {formatDate(topic.last_recalled_at, tz)}</span>
+        <span>{topic.total_recalls} recall{topic.total_recalls === 1 ? "" : "s"}</span>
+        <span className="inline-flex items-center gap-1">
+          Próxima: <NextReviewCell daysOverdue={topic.days_overdue} dimmed={topic.total_recalls < 2} />
+        </span>
+      </div>
     </div>
   )
 }
@@ -329,6 +414,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       const data = await res.json().catch(() => ({}))
       toast.error(data.error ?? "Error al fusionar")
     } else {
+      toast.success("Temas fusionados")
       router.refresh()
     }
   }
@@ -409,6 +495,9 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       const failedTopics = prev.filter((t) => failedIds.includes(t.id))
       setLocalTopics((ts) => [...ts, ...failedTopics])
       toast.error(`No se pudieron borrar ${failedIds.length} de ${ids.length} temas.`)
+    } else {
+      const n = ids.length
+      toast.success(`${n} tema${n === 1 ? "" : "s"} borrado${n === 1 ? "" : "s"}`)
     }
     setSelected((s) => {
       const next = new Set(s)
@@ -551,7 +640,8 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
         </div>
       )}
 
-      <div className="mt-6 overflow-hidden rounded-lg ring-1 ring-border">
+      {/* Tabla — solo desktop (≥ md) */}
+      <div className="mt-6 hidden overflow-hidden rounded-lg ring-1 ring-border md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -644,6 +734,30 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Tarjetas — solo móvil (< md) */}
+      <div className="mt-6 space-y-3 md:hidden">
+        {filtered.length === 0 ? (
+          <p className="py-12 text-center text-muted-foreground">No se encontraron temas</p>
+        ) : (
+          filtered.map((topic) => (
+            <MobileTopicCard
+              key={topic.id}
+              topic={topic}
+              selected={selected.has(topic.id)}
+              onToggle={() => toggleSelect(topic.id)}
+              onRename={handleRename}
+              allGroups={allGroups}
+              onAddGroup={(name) => addGroupToTopic(topic.id, name)}
+              onRemoveGroup={(groupId) => removeGroupFromTopic(topic.id, groupId)}
+              targets={localTopics.filter((t) => t.id !== topic.id)}
+              onMerge={handleMerge}
+              onDelete={handleDelete}
+              tz={tz}
+            />
+          ))
+        )}
       </div>
     </>
   )
