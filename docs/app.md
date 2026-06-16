@@ -176,6 +176,27 @@ Rutas disponibles:
 
 El dashboard solo lee de Supabase — nunca escribe.
 
+### Sistema visual
+
+El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
+
+- **Marca**: logo "Recall" (bucle circular ↺ con punto, gradiente magenta) en
+  `components/logo.tsx` (`LogoMark` + `Logo`); el favicon vive en `app/icon.svg`
+  (convención de App Router). El header de `/` usa `<Logo />`.
+- **Radio**: un único token raíz `--radius: 0.625rem` en `globals.css`; Tailwind v4
+  deriva `--radius-sm/md/lg` vía `calc()`, así que todos los `rounded-*` cascadean
+  desde ahí. **No** hardcodear radios fijos (`rounded` a secas) — usar las
+  utilidades del token (`rounded-md`, `rounded-sm`, `rounded-lg`).
+- **Feedback in-app** (no `alert()`/`confirm()` nativos):
+  - **Toasts** con `sonner` → `components/ui/sonner.tsx` (`<Toaster />`, tema
+    sincronizado a `next-themes`). Para errores: `toast.error(msg)`.
+  - **Confirmaciones** con `components/confirm-dialog.tsx`: `<ConfirmProvider>`
+    (montado en `app/layout.tsx`) + hook `useConfirm()` promise-based sobre Radix
+    AlertDialog. Patrón en el call site: `if (!(await confirm({ title, … }))) return`.
+- **Idioma**: toda la UI visible está en español (los términos de dominio
+  "recall"/"quick review"→"repaso rápido" y los préstamos "feedback"/"email" se
+  mantienen).
+
 ### Columna "Próxima"
 
 Muestra cuándo toca el próximo `recall_completo` según SM-2.

@@ -56,8 +56,16 @@ components/topic-detail-header.tsx — header editable del detalle (nombre, desc
 components/subsection-list.tsx — renombrar subsecciones inline
 components/topic-sessions.tsx  — historial; borrar recall y editar su feedback
 components/settings-form.tsx   — toggle de ajustes por usuario
+components/logo.tsx            — LogoMark + Logo (marca "Recall"); favicon en app/icon.svg
+components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza confirm() nativo)
+components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error() en vez de alert()
 components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table)
 ```
+
+**Sistema visual**: lenguaje "redondeado y cálido". Radio = un solo token
+`--radius` en `globals.css` (Tailwind v4 deriva sm/md/lg); no hardcodear radios
+fijos. Feedback in-app (no `alert`/`confirm` nativos): `toast.error()` y
+`await confirm({…})` vía `useConfirm()`. UI en español. Ver `docs/app.md` → "Sistema visual".
 
 ## Gotchas
 
@@ -77,6 +85,7 @@ components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table
 
 - Next.js 16 App Router + Turbopack
 - shadcn/ui + Tailwind CSS v4 (Radix vía paquete unificado `radix-ui`)
+- `sonner` (toasts) + `next-themes` (modo claro/oscuro)
 - Supabase (`@supabase/supabase-js`) — lectura (`lib/db.ts`) y escritura (`lib/db-mcp.ts`)
 - `@modelcontextprotocol/sdk` + zod v4 — MCP server HTTP
 - @tabler/icons-react
