@@ -53,9 +53,10 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
   - Migración `2026-06-14_auth-id.sql`: agrega `users.auth_id` (nullable) +
     índice único. Correr en Supabase SQL editor.
   - `lib/supabase-admin.ts` (service-role). Requiere env `SUPABASE_SERVICE_ROLE_KEY`.
-  - Script `scripts/seed-auth-users.mjs`: crea usuarios en `auth.users` a partir
-    de las credenciales existentes (`dashboard_user`/`dashboard_pass`) y linkea
-    `auth_id`. Idempotente. Requiere service_role key + emails.
+  - Script `scripts/seed-auth-users.mjs` (one-time): creó los usuarios en
+    `auth.users` a partir de las credenciales existentes
+    (`dashboard_user`/`dashboard_pass`) y linkeó `auth_id`. **Eliminado en D4**
+    tras dropear `dashboard_pass` (ya no podría correr; su trabajo está hecho).
 - **D2 — Login Supabase Auth en el dashboard.** ✅ en esta rama:
   - `@supabase/ssr` + `supabase-server.ts` / `supabase-middleware.ts`.
   - Página `/login` (Server Component + Server Action) y logout (`/auth/signout`,
@@ -84,9 +85,12 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
   - ✅ OAuth `/authorize` migrado a Supabase Auth (email + contraseña) vía
     `getUserByAuthCreds`; ya no lee `dashboard_pass`. `getUserByDashboardCreds`
     eliminada.
-  - **Pendiente (destructivo)**: `migrations/2026-06-15_drop-dashboard-pass.sql`
-    — correr SOLO tras desplegar D4 (para que el `/authorize` viejo de prod no
-    lea la columna) y con snapshot confirmado. `dashboard_user` se conserva.
+  - ✅ Desplegado a producción (`vercel --prod`); `/authorize` y `/login` de prod
+    validan con Supabase Auth.
+  - ✅ `migrations/2026-06-15_drop-dashboard-pass.sql` aplicada: columna
+    `dashboard_pass` eliminada (tras deploy + snapshot). `dashboard_user` se
+    conserva. `scripts/seed-auth-users.mjs` eliminado (quedó obsoleto).
+    **Track D completo.**
 
 ## Tablas y scoping para RLS
 

@@ -5,8 +5,10 @@ usuarios reales, identificados por token.
 
 ## Modelo
 
-- Tabla `users` (`id`, `name`, `mcp_token` único, `dashboard_user`,
-  `dashboard_pass`, `created_at`).
+- Tabla `users` (`id`, `name`, `mcp_token` único, `dashboard_user`, `auth_id`
+  (FK → `auth.users`), `created_at`). La contraseña ya no vive acá: la maneja
+  Supabase Auth (hasheada en `auth.users`). La columna `dashboard_pass` se
+  eliminó en D4 (ver `migrations/2026-06-15_drop-dashboard-pass.sql`).
 - Columna `user_id` (FK → `users.id`, NOT NULL) en 7 tablas que se consultan
   directamente: `topics`, `topic_groups`, `topic_subsections`, `recalls`,
   `quick_review_sessions`, `review_sessions`, `review_session_slots`.
