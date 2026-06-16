@@ -77,8 +77,16 @@ as $$ select id from public.users where auth_id = auth.uid() $$;
   - **Verificado a nivel DB**: una sesión consultando `topics` sin filtro
     `user_id` ve solo sus filas (Emily 57, Lesty 42, 0 cruzadas). Dashboard y MCP
     siguen funcionando (MCP por service-role salta RLS).
-- **D4 — Signup público + limpieza.** `/signup` crea auth user + fila `users` +
-  `mcp_token`. Eliminar columna `dashboard_pass`. Actualizar `docs/multiuser.md`.
+- **D4 — Signup público + limpieza.**
+  - ✅ `/signup`: página + Server Action que crea auth user + fila `users` +
+    `mcp_token` + `app_metadata.app_user_id` (con rollback si algo falla).
+    email_confirm:true (sin SMTP) — deuda: no verifica titularidad del email.
+  - ✅ OAuth `/authorize` migrado a Supabase Auth (email + contraseña) vía
+    `getUserByAuthCreds`; ya no lee `dashboard_pass`. `getUserByDashboardCreds`
+    eliminada.
+  - **Pendiente (destructivo)**: `migrations/2026-06-15_drop-dashboard-pass.sql`
+    — correr SOLO tras desplegar D4 (para que el `/authorize` viejo de prod no
+    lea la columna) y con snapshot confirmado. `dashboard_user` se conserva.
 
 ## Tablas y scoping para RLS
 

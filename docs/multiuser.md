@@ -23,14 +23,14 @@ usuarios reales, identificados por token.
   `users.mcp_token` → `user.id`, que se pasa a `createMcpServer(userId)` y de ahí
   a cada tool y a cada función de `db-mcp.ts`.
 - **OAuth** (`/api/oauth/*`, lo usa Claude Desktop): la página `/authorize` pide
-  **usuario + contraseña**, validados contra `users` (`getUserByDashboardCreds`).
+  **email + contraseña**, validados contra Supabase Auth (`getUserByAuthCreds`).
   El `user.id` se firma dentro del `code` (HMAC con `MCP_API_KEY` como secreto de
   firma del servidor) y `/api/oauth/token` devuelve el `mcp_token` **de ese
   usuario** (`getMcpTokenByUserId`). `client_credentials` exige que el secreto sea
   un `mcp_token` válido y lo devuelve tal cual. Antes el OAuth era single-user
   (devolvía siempre `MCP_API_KEY`) — corregido.
-- **Dashboard** (`middleware.ts`): Basic auth se resuelve contra
-  `users.dashboard_user`/`dashboard_pass`; el `user_id` se propaga por el header
+- **Dashboard** (`middleware.ts`): sesión de **Supabase Auth** (cookies SSR); el
+  `user_id` (de `app_metadata.app_user_id`) se propaga por el header
   `x-recall-user-id`. Server Components y route handlers lo leen con
   `currentUserId()` (`lib/auth.ts`) y lo pasan a cada función de `db.ts`.
 
@@ -38,9 +38,9 @@ usuarios reales, identificados por token.
 
 - **Emily** (id 1): dueña de todos los datos previos a la migración. Su
   `mcp_token` es el `MCP_API_KEY` anterior (Claude Desktop sigue sin cambios).
-  Dashboard: `emily` / contraseña anterior.
-- **Lesty** (id 2): nueva. Token y credenciales de dashboard generados aparte
-  (no en el repo). Sin datos aún.
+  Dashboard: login con email (`emilycoordoba@gmail.com`) vía Supabase Auth.
+- **Lesty** (id 2): login con email (`lesty.cordoba@gmail.com`) vía Supabase Auth.
+  `mcp_token` generado aparte (no en el repo).
 
 ## Aislamiento — verificado
 
@@ -57,9 +57,13 @@ usuarios reales, identificados por token.
   y el dashboard usa el cliente con sesión. El MCP usa `service_role` (salta RLS);
   su token ya scopea al usuario. `.eq("user_id", …)` se mantiene en las queries
   como defensa en profundidad. **Ya seguro para signup público** (pendiente D4).
-- `dashboard_pass` aún en **texto plano**: lo usa solo el path OAuth/MCP
-  (`getUserByDashboardCreds`). El login del dashboard ya pasó a Supabase Auth (que
-  hashea internamente). Eliminar la columna y migrar OAuth → D4.
+- ✅ ~~`dashboard_pass` en texto plano~~ — **resuelto en D4**: ni el dashboard ni
+  el OAuth/MCP lo leen ya. El login (`/login`) y el `/authorize` validan contra
+  Supabase Auth (`getUserByAuthCreds`, que hashea internamente);
+  `getUserByDashboardCreds` se eliminó. La columna sigue en la DB pero sin uso:
+  el DROP destructivo está en `migrations/2026-06-15_drop-dashboard-pass.sql`
+  (correr tras deploy de D4 + snapshot). `scripts/seed-auth-users.mjs` quedó
+  obsoleto. Signup público en `/signup`.
 
 ## Backup
 

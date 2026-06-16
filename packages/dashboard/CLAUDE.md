@@ -24,6 +24,8 @@ Desde la raíz del monorepo: `npm run dev:dashboard` / `npm run start:dashboard`
 | `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
 | `/settings` | Ajustes por usuario (p.ej. "repaso solo con temas estrenados"). |
+| `/login` · `/signup` | Auth del dashboard (Supabase Auth, email+contraseña). `/signup` crea auth user + fila `users` + `mcp_token`. Logout en `/auth/signout` (POST). |
+| `/authorize` · `/api/oauth/*` | Flujo OAuth para que Claude Desktop obtenga su Bearer token; valida con Supabase Auth (email+contraseña). |
 | `/api/topics/[id]` | `PATCH` (nombre/descripción) · `DELETE` (borrar topic) · `GET`. |
 | `/api/topics/[id]/groups` | `POST { name }` (agregar/crear grupo) · `DELETE ?groupId=` (quitar). |
 | `/api/topics/merge` | `POST { sourceId, targetId }` — fusiona el origen en el destino. |
