@@ -9,13 +9,22 @@ import { Button } from "@/components/ui/button"
 // Island cliente: alterna entre claro/oscuro. El resto del header es Server
 // Component, así que solo este botón hidrata. El atajo de teclado `d` vive en
 // theme-provider.tsx; esto le da un control visible y descubrible.
+// Devuelve false en SSR y en el primer render de hidratación (coinciden → sin
+// mismatch), true después. Equivale al patrón `mounted` de next-themes pero sin
+// setState dentro de un effect (regla react-hooks/set-state-in-effect).
+function useHydrated() {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
+}
+
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
-  const [mounted, setMounted] = React.useState(false)
-
-  // Hasta montar, `resolvedTheme` es indefinido (vive en el cliente). Sin este
+  // Hasta hidratar, `resolvedTheme` es indefinido (vive en el cliente); sin este
   // guard el HTML del servidor no coincide con el del cliente → hydration warning.
-  React.useEffect(() => setMounted(true), [])
+  const mounted = useHydrated()
 
   const isDark = resolvedTheme === "dark"
 

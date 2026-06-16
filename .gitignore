@@ -1,23 +1,26 @@
 node_modules/
-packages/*/node_modules/
-
-# MCP server build
-packages/mcp-server/dist/
 
 # Next.js
-packages/dashboard/.next/
-packages/dashboard/out/
+.next/
+out/
+
+# TypeScript / build artifacts
+next-env.d.ts
+*.tsbuildinfo
 
 # DB
 *.db
 *.db-shm
 *.db-wal
 
+# Env
 .env
 .env.local
 
 # Claude Code
 .claude/
 
+# Vercel
 .vercel
+
 backups/
