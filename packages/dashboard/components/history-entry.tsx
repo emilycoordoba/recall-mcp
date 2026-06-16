@@ -5,10 +5,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { IconCheck, IconX, IconChevronDown, IconChevronUp, IconBolt } from "@tabler/icons-react"
 import type { HistoryEntry } from "@/lib/db"
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-}
+import { timeInTz } from "@/lib/dates"
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return null
@@ -19,7 +16,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   return <Badge variant="destructive" className="shrink-0">{score.toFixed(1)}</Badge>
 }
 
-export function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
+export function HistoryEntryRow({ entry, tz }: { entry: HistoryEntry; tz: string }) {
   const [open, setOpen] = useState(false)
   const isRecall = entry.type === "recall"
 
@@ -32,7 +29,7 @@ export function HistoryEntryRow({ entry }: { entry: HistoryEntry }) {
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="w-12 text-right font-mono text-xs text-muted-foreground shrink-0">
-          {formatTime(entry.date)}
+          {timeInTz(entry.date, tz)}
         </span>
 
         <div className="w-24 shrink-0">

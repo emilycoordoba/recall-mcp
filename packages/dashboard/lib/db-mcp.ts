@@ -2,6 +2,7 @@
 // nivel app (`.eq("user_id", …)`) y el Bearer token ya scopea al usuario.
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { suggestDifficulty } from "./difficulty";
+import { DEFAULT_TIMEZONE, dayInTz, addDays } from "./dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,10 +114,16 @@ export interface UserSettings {
   // pushing a never-practiced topic into spaced repetition is what flooded the
   // session with unfamiliar material.
   review_only_practiced: boolean;
+  // IANA timezone (e.g. "America/Mexico_City") in which this user's days are
+  // computed: streak buckets, SM-2 "today"/days_overdue, and the day headers in
+  // the dashboard. Auto-detected from the browser on the first authenticated
+  // dashboard visit; until then DEFAULT_TIMEZONE applies. See lib/dates.ts.
+  timezone: string;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   review_only_practiced: true,
+  timezone: DEFAULT_TIMEZONE,
 };
 
 export async function getUserSettings(userId: number): Promise<UserSettings> {
@@ -408,6 +415,10 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
   const { data, error } = await query;
   if (error) throw error;
 
+  // "Today" in the user's zone, computed once for the whole batch (days_overdue).
+  const tz = (await getUserSettings(userId)).timezone;
+  const todayIso = dayInTz(new Date(), tz);
+
   return ((data ?? []) as unknown as CandidateRow[])
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
@@ -493,7 +504,6 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       const nextReviewDate = lastRIso
         ? new Date(new Date(lastRIso).getTime() + sm2Interval * 86_400_000).toISOString().slice(0, 10)
         : null;
-      const todayIso = new Date().toISOString().slice(0, 10);
       const daysOverdue = nextReviewDate
         ? Math.round((Date.parse(todayIso) - Date.parse(nextReviewDate)) / 86_400_000)
         : recalls.length === 0 && qrs.length === 0 ? 999
@@ -1257,18 +1267,18 @@ export async function getStats(userId: number): Promise<Stats> {
   ]);
   const topicsNeverRecalled = (topics ?? []).filter((t) => !sessionedIds.has(t.id)).length;
 
-  // Racha de días consecutivos hasta hoy (fechas locales, no UTC)
-  const localDate = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Racha de días consecutivos hasta hoy, en la zona horaria del usuario (no UTC:
+  // el proceso de Vercel corre en UTC, así que getDate() bucketea mal de noche).
+  const tz = (await getUserSettings(userId)).timezone;
   const allDays = new Set([
-    ...(recalls ?? []).map((r) => localDate(new Date(r.recalled_at))),
-    ...(qrs ?? []).map((q) => localDate(new Date(q.reviewed_at))),
+    ...(recalls ?? []).map((r) => dayInTz(r.recalled_at, tz)),
+    ...(qrs ?? []).map((q) => dayInTz(q.reviewed_at, tz)),
   ]);
   let streak = 0;
-  const cur = new Date();
-  while (allDays.has(localDate(cur))) {
+  let cur = dayInTz(new Date(), tz);
+  while (allDays.has(cur)) {
     streak++;
-    cur.setDate(cur.getDate() - 1);
+    cur = addDays(cur, -1);
   }
 
   // Última sesión

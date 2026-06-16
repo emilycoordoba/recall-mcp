@@ -25,10 +25,11 @@ import { IconCheck, IconX, IconBolt, IconTrash } from "@tabler/icons-react"
 import { DifficultyBadge } from "@/components/difficulty-badge"
 import { useConfirm } from "@/components/confirm-dialog"
 
-function formatDate(iso: string) {
+function formatDate(iso: string, tz: string) {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "—"
   return d.toLocaleDateString("es-ES", {
+    timeZone: tz,
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -177,9 +178,10 @@ function RecallFeedback({
 interface Props {
   sessions: Session[]
   subsections: { id: number; name: string }[]
+  tz: string
 }
 
-export function TopicSessions({ sessions, subsections }: Props) {
+export function TopicSessions({ sessions, subsections, tz }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [filter, setFilter] = useState<string>("all")
@@ -251,7 +253,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{formatDate(session.date)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz)}</span>
                       <Badge variant="outline" className="text-xs">Recall completo</Badge>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -321,7 +323,7 @@ export function TopicSessions({ sessions, subsections }: Props) {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{formatDate(session.date)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz)}</span>
                       <Badge variant="secondary" className="flex items-center gap-1 text-xs">
                         <IconBolt className="h-3 w-3" />
                         Repaso rápido

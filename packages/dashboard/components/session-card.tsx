@@ -5,10 +5,7 @@ import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { IconBolt, IconChevronDown, IconChevronUp, IconListDetails, IconRefresh } from "@tabler/icons-react"
 import type { ReviewSessionEntry } from "@/lib/db"
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-}
+import { timeInTz } from "@/lib/dates"
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return <span className="text-xs text-muted-foreground/50 font-mono">—</span>
@@ -43,7 +40,7 @@ function FormatBadge({ format }: { format: ReviewSessionEntry["slots"][number]["
 
 const SLOT_LABEL: Record<number, string> = { 1: "Urgente", 2: "Fallo", 3: "Consolid.", 4: "Recall" }
 
-export function SessionCard({ session }: { session: ReviewSessionEntry }) {
+export function SessionCard({ session, tz }: { session: ReviewSessionEntry; tz: string }) {
   const [open, setOpen] = useState(false)
 
   const completedSlots = session.slots.filter((s) => s.score !== null).length
@@ -59,7 +56,7 @@ export function SessionCard({ session }: { session: ReviewSessionEntry }) {
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
       >
         <span className="font-mono text-xs text-muted-foreground shrink-0 w-12">
-          {formatTime(session.started_at)}
+          {timeInTz(session.started_at, tz)}
         </span>
 
         <div className="flex-1 min-w-0 flex items-center gap-2">

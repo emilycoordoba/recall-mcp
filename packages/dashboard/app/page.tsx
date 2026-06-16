@@ -1,10 +1,11 @@
 import Link from "next/link"
-import { getTopics, getStudyStreak, getGroups, type TopicRow } from "@/lib/db"
+import { getTopics, getStudyStreak, getGroups, getUserTimezone, type TopicRow } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
 import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
 import { Logo } from "@/components/logo"
 import { LogoutButton } from "@/components/logout-button"
+import { TimezoneSync } from "@/components/timezone-sync"
 
 function groupStats(topics: TopicRow[]): GroupStat[] {
   // Agrupa por id (no por nombre) para poder borrar el grupo desde la tarjeta.
@@ -33,16 +34,18 @@ function groupStats(topics: TopicRow[]): GroupStat[] {
 
 export default async function DashboardPage() {
   const userId = await currentUserId()
-  const [topics, streak, allGroups] = await Promise.all([
+  const [topics, streak, allGroups, tz] = await Promise.all([
     getTopics(userId),
     getStudyStreak(userId),
     getGroups(userId),
+    getUserTimezone(userId),
   ])
   const groups = Array.from(new Set(topics.flatMap((t) => t.groups.map((g) => g.name)))).sort((a, b) => a.localeCompare(b))
   const stats = groupStats(topics)
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
+      <TimezoneSync stored={tz} />
       <div className="mb-8 flex items-center justify-between gap-4">
         <div>
           <Logo />
@@ -71,7 +74,7 @@ export default async function DashboardPage() {
 
       <GroupStatCards stats={stats} />
 
-      <DashboardFilters topics={topics} groups={groups} allGroups={allGroups} />
+      <DashboardFilters topics={topics} groups={groups} allGroups={allGroups} tz={tz} />
     </div>
   )
 }

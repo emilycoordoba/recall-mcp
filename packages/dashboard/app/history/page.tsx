@@ -1,23 +1,20 @@
 import Link from "next/link"
-import { getHistory } from "@/lib/db"
+import { getHistory, getUserTimezone } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { HistoryEntryRow } from "@/components/history-entry"
+import { dayInTz, formatDayLabel } from "@/lib/dates"
 
-function formatDay(iso: string) {
-  return new Date(iso + "T12:00:00").toLocaleDateString("es-ES", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  })
-}
+export const metadata = { title: "Historial" }
 
 export default async function HistoryPage() {
-  const entries = await getHistory(await currentUserId())
+  const userId = await currentUserId()
+  const [entries, tz] = await Promise.all([getHistory(userId), getUserTimezone(userId)])
 
+  // Bucket by the user's local day, not the UTC date inside the timestamp: a
+  // late-evening session would otherwise land under the next day's header.
   const byDay = new Map<string, typeof entries>()
   for (const entry of entries) {
-    const day = entry.date.slice(0, 10)
+    const day = dayInTz(entry.date, tz)
     if (!byDay.has(day)) byDay.set(day, [])
     byDay.get(day)!.push(entry)
   }
@@ -43,11 +40,11 @@ export default async function HistoryPage() {
           {Array.from(byDay.entries()).map(([day, dayEntries]) => (
             <div key={day}>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground capitalize">
-                {formatDay(day)}
+                {formatDayLabel(day)}
               </h2>
               <div className="overflow-hidden rounded-lg ring-1 ring-border divide-y divide-border">
                 {dayEntries.map((entry) => (
-                  <HistoryEntryRow key={`${entry.type}-${entry.id}`} entry={entry} />
+                  <HistoryEntryRow key={`${entry.type}-${entry.id}`} entry={entry} tz={tz} />
                 ))}
               </div>
             </div>
