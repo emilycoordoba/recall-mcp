@@ -50,7 +50,7 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 |---|---|
 | `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
-| `/settings` | Ajustes por usuario (p.ej. "repaso solo con temas estrenados"). |
+| `/settings` | Ajustes por usuario: "repaso solo con temas estrenados", **cantidad de temas por sesión** (`review_slots`, 2–6, default 4; server-enforced en `get_review_plan`) y **dificultad adaptativa en vivo** (`adaptive_difficulty`, soft pref que `get_review_plan` expone para que la IA la honre). Ver `docs/METODOLOGIA.md`. |
 | `/prompt` | Muestra las plantillas de system prompt (general/mate) para copiar a Claude Desktop. Estático (sin DB); contenido leído de los `.md` de la raíz. |
 | `/login` · `/signup` | Auth del dashboard (Supabase Auth, email+contraseña). `/signup` crea auth user + fila `users` + `mcp_token`. Logout en `/auth/signout` (POST). |
 | `/authorize` · `/api/oauth/*` | Flujo OAuth para que Claude Desktop obtenga su Bearer token; valida con Supabase Auth (email+contraseña). |

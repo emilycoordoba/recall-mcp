@@ -3,6 +3,17 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import type { UserSettings } from "@/lib/db-mcp"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+// Slot-count options offered in the UI. Must stay within REVIEW_SLOTS_MIN..MAX
+// (the API clamps anyway, but keeping the UI in range avoids a silent snap-back).
+const SLOT_OPTIONS = [2, 3, 4, 5, 6]
 
 function Toggle({
   checked,
@@ -33,6 +44,26 @@ function Toggle({
   )
 }
 
+function Row({
+  title,
+  description,
+  control,
+}: {
+  title: string
+  description: string
+  control: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start justify-between gap-6 p-4">
+      <div>
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  )
+}
+
 export function SettingsForm({ initial }: { initial: UserSettings }) {
   const [settings, setSettings] = useState(initial)
   const [saving, setSaving] = useState(false)
@@ -57,21 +88,53 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
   }
 
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-start justify-between gap-6 p-4">
-        <div>
-          <p className="text-sm font-medium">Repasar solo temas ya estrenados</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Cuando está activo, los temas que nunca repasaste no entran a la sesión de
-            repaso espaciado: se listan aparte como temas pendientes por estrenar.
-          </p>
-        </div>
-        <Toggle
-          checked={settings.review_only_practiced}
-          disabled={saving}
-          onChange={(v) => update({ review_only_practiced: v })}
-        />
-      </div>
+    <div className="divide-y rounded-lg border bg-card">
+      <Row
+        title="Repasar solo temas ya estrenados"
+        description="Cuando está activo, los temas que nunca repasaste no entran a la sesión de repaso espaciado: se listan aparte como temas pendientes por estrenar."
+        control={
+          <Toggle
+            checked={settings.review_only_practiced}
+            disabled={saving}
+            onChange={(v) => update({ review_only_practiced: v })}
+          />
+        }
+      />
+
+      <Row
+        title="Temas por sesión de repaso"
+        description="Cuántos temas trae cada sesión. Menos = sesiones más cortas (se recortan primero el recall completo y la consolidación); más = sesiones más largas."
+        control={
+          <Select
+            value={String(settings.review_slots)}
+            disabled={saving}
+            onValueChange={(v) => update({ review_slots: Number(v) })}
+          >
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SLOT_OPTIONS.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
+
+      <Row
+        title="Dificultad adaptativa en vivo"
+        description="Cuando está activo, el tutor sube o baja el nivel de los ejercicios dentro de la misma sesión según cómo vayas respondiendo, en vez de mantener un solo nivel. Pensado sobre todo para práctica de procedimientos (mate)."
+        control={
+          <Toggle
+            checked={settings.adaptive_difficulty}
+            disabled={saving}
+            onChange={(v) => update({ adaptive_difficulty: v })}
+          />
+        }
+      />
     </div>
   )
 }

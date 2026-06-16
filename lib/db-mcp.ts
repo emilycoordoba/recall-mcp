@@ -114,6 +114,18 @@ export interface UserSettings {
   // pushing a never-practiced topic into spaced repetition is what flooded the
   // session with unfamiliar material.
   review_only_practiced: boolean;
+  // How many slots a review session emits (REVIEW_SLOTS_MIN..MAX). The fixed-
+  // purpose slots (urgent → persistent → consolidation → full recall) are built
+  // and then trimmed from the end (4→3 drops the full recall, 3→2 drops the
+  // consolidation); values above 4 append extra "urgent quick" picks. Server-
+  // enforced — get_review_plan returns exactly this many slots when there are
+  // enough candidates.
+  review_slots: number;
+  // When true, the tutor adjusts exercise difficulty live within a session (a
+  // staircase around suggested_difficulty) instead of holding one level. The
+  // server only surfaces the flag in get_review_plan; the model honors it. Mainly
+  // relevant for procedural practice (math). See lib/difficulty.ts.
+  adaptive_difficulty: boolean;
   // IANA timezone (e.g. "America/Mexico_City") in which this user's days are
   // computed: streak buckets, SM-2 "today"/days_overdue, and the day headers in
   // the dashboard. Auto-detected from the browser on the first authenticated
@@ -121,8 +133,17 @@ export interface UserSettings {
   timezone: string;
 }
 
+// Bounds for review_slots, shared by the API validator and getReviewPlan so the
+// clamp rule lives in one place.
+export const REVIEW_SLOTS_MIN = 2;
+export const REVIEW_SLOTS_MAX = 6;
+export const clampReviewSlots = (n: number) =>
+  Math.max(REVIEW_SLOTS_MIN, Math.min(REVIEW_SLOTS_MAX, Math.round(n)));
+
 export const DEFAULT_SETTINGS: UserSettings = {
   review_only_practiced: true,
+  review_slots: 4,
+  adaptive_difficulty: true,
   timezone: DEFAULT_TIMEZONE,
 };
 
@@ -985,7 +1006,9 @@ export async function deleteTopic(topicName: string, userId: number) {
 }
 
 export interface ReviewSlot {
-  slot: 1 | 2 | 3 | 4;
+  // 1..4 are the fixed-purpose slots; 5+ are extra "urgent quick" slots emitted
+  // when the user sets review_slots above 4.
+  slot: number;
   purpose: "most_urgent" | "persistent_failure" | "consolidation" | "full_recall" | "fallback";
   format: "quick" | "recall_dirigido" | "recall_completo";
   topic_id: number;
@@ -1016,7 +1039,16 @@ export interface NewTopic {
 export async function getReviewPlan(
   userId: number,
   groupName?: string,
-): Promise<{ slots: ReviewSlot[]; session_id?: number; message?: string; new_topics: NewTopic[] }> {
+): Promise<{
+  slots: ReviewSlot[];
+  session_id?: number;
+  message?: string;
+  new_topics: NewTopic[];
+  // Active preferences the model should honor this session (the soft, AI-
+  // interpreted ones). Structural prefs like review_slots are already applied
+  // server-side; adaptive_difficulty is surfaced here for the tutor to read.
+  settings?: { adaptive_difficulty: boolean };
+}> {
   const [allCandidates, { data: recentSlotRows }, settings] = await Promise.all([
     getReviewCandidates(userId, groupName),
     supabase
@@ -1024,7 +1056,9 @@ export async function getReviewPlan(
       .select("topic_id, slot_number, subsection_names, session_id")
       .eq("user_id", userId)
       .order("id", { ascending: false })
-      .limit(SLOT1_COOLDOWN_SESSIONS * 4 + 4), // enough rows to cover recent sessions
+      // Enough rows to cover SLOT1_COOLDOWN_SESSIONS sessions even at the max
+      // configurable slot count, plus a margin.
+      .limit(SLOT1_COOLDOWN_SESSIONS * REVIEW_SLOTS_MAX + REVIEW_SLOTS_MAX),
     getUserSettings(userId),
   ]);
 
@@ -1187,6 +1221,30 @@ export async function getReviewPlan(
     });
   }
 
+  // Honor the user's configured slot count. The 4 purposeful slots above are the
+  // canonical session; trimming drops the deeper formats first (full recall, then
+  // consolidation), and counts above 4 append extra "urgent quick" picks from the
+  // remaining candidates. Server-enforced so the model never decides how many.
+  const targetSlots = clampReviewSlots(settings.review_slots ?? DEFAULT_SETTINGS.review_slots);
+  if (slots.length > targetSlots) {
+    slots.length = targetSlots;
+  } else {
+    while (slots.length < targetSlots) {
+      const extra = candidates.find((c) => !used.has(c.topic_id));
+      if (!extra) break; // not enough distinct topics to fill the extra slots
+      used.add(extra.topic_id);
+      const target = weakestQuickSubsection(extra);
+      slots.push({
+        slot: slots.length + 1, purpose: "fallback", format: "quick",
+        topic_id: extra.topic_id, topic_name: extra.topic_name, group_name: extra.group_name,
+        days_since_recall: extra.days_since_recall, days_since_full_recall: extra.days_since_full_recall,
+        avg_score: extra.avg_score, total_recalls: extra.total_recalls,
+        target_subsection: target,
+        recent_questions: recentQuestionsFor(extra, target),
+      });
+    }
+  }
+
   // Attach procedural-practice difficulty to each slot from its candidate, so we
   // don't thread it through all the slot-building branches above.
   const diffByTopic = new Map(
@@ -1227,7 +1285,12 @@ export async function getReviewPlan(
     // Session persistence is best-effort — don't fail the plan if it errors
   }
 
-  return { slots, session_id, new_topics: newTopics };
+  return {
+    slots,
+    session_id,
+    new_topics: newTopics,
+    settings: { adaptive_difficulty: settings.adaptive_difficulty ?? DEFAULT_SETTINGS.adaptive_difficulty },
+  };
 }
 
 export async function getStats(userId: number): Promise<Stats> {

@@ -88,7 +88,7 @@ export function SessionCard({ session, tz }: { session: ReviewSessionEntry; tz: 
               </span>
 
               <span className="text-xs text-muted-foreground shrink-0 w-16 hidden sm:block">
-                {SLOT_LABEL[slot.slot_number]}
+                {SLOT_LABEL[slot.slot_number] ?? "Extra"}
               </span>
 
               <FormatBadge format={slot.format} />

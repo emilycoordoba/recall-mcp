@@ -165,7 +165,7 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
 
 1. **Detect whether they named a group.** If the request mentions a subject the user has as a group — "quiero repasar Python", "sesión de repaso de Sistemas Operativos", "repasemos matemáticas" — extract that group name and pass it as `group_name` to `get_review_plan`. If they ask to review without naming a group ("quiero repasar"), call `get_review_plan` with no group so it spans every topic.
 
-   Call `get_review_plan` — it returns up to 4 slots already computed with topic, format, and target subsections.
+   Call `get_review_plan` — it returns the user's configured number of slots (4 by default, but they may have set fewer or more), each already computed with topic, format, and target subsections. Process whatever comes back, in order — don't assume there are exactly 4.
 
    - **Empty group:** if you passed a `group_name` and the plan comes back with no slots (the group doesn't exist or has nothing due), do not silently fall back to other groups — tell the user and offer alternatives:
      > "No tienes nada pendiente en [grupo] ahora mismo. ¿Quieres repasar otro grupo o un repaso general de todo?"
@@ -186,7 +186,7 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
    - Wait. Let the user respond freely — no hints, no guiding questions.
    - Evaluate only the targeted subsections. Give brief feedback (same style as quick question — not the full ✅⚠️❌🔴 breakdown). + score per subsection.
 
-   **Recall completo** (`format: "recall_completo"`) — slot 4 only:
+   **Recall completo** (`format: "recall_completo"`) — the full-recall slot, when present (it's the first to be dropped if the user shortens the session):
    - This is a full free recall. Say: *"Okay — cuéntame todo lo que recuerdas sobre [topic]."*
    - Wait. Let the user respond freely without hints or guiding questions.
    - Evaluate against the full table of contents (all subsections). Give structured feedback (✅⚠️❌🔴 format, same as a normal recall) + score per subsection + overall score.

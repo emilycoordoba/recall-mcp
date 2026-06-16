@@ -77,23 +77,31 @@ Casos especiales:
 
 ## Cómo se decide qué repasar (plan de repaso)
 
-`get_review_plan` devuelve 3 slots. Cada slot usa un topic distinto.
+`get_review_plan` devuelve, por defecto, **4 slots** de propósito fijo. Cada slot usa un topic distinto.
+
+> **Cantidad configurable (`review_slots`, 2–6, default 4).** Los 4 slots de propósito se construyen siempre y luego el servidor **recorta desde el final** (4→3 quita el recall completo, 3→2 quita la consolidación) o **extiende** con slots "quick urgentes" extra (5, 6) si hay candidatos. Es server-enforced: el modelo nunca decide cuántos. Se ajusta en `/settings`.
 
 ### Slot 1 — Más urgente
-El topic con mayor `urgency`. Formato: **quick** (1 pregunta sobre la subsección con menor avg_score).
+El topic con mayor `urgency`. Formato: **quick** (1 pregunta sobre la subsección con menor avg_score). Tiene cooldown: un topic que fue slot 1 en las últimas 2 sesiones no vuelve a serlo.
 
 ### Slot 2 — Fallo persistente
-El topic más urgente (distinto al slot 1) que tenga al menos una subsección con `times_missed >= 2` en su ventana reciente. Formato: **recall dirigido** sobre las subsecciones más falladas.
+El topic más urgente (distinto al slot 1) que tenga al menos una subsección con `times_missed >= 2` **y** `avg_score < 4.0` en su ventana reciente. Formato: **recall dirigido** sobre las subsecciones más falladas.
 
-Si no hay candidato con `times_missed >= 2`, cae a un segundo topic urgente en formato quick.
+Si no hay candidato, cae a un segundo topic urgente en formato quick.
 
 ### Slot 3 — Consolidación
 Un topic que cumpla **los tres** criterios:
-- `total_recalls >= 3` (genuinamente practicado, no visto una sola vez)
+- `total_recalls >= 1` (ya practicado al menos una vez)
 - `avg_score >= 3.5` (bien aprendido)
 - `days_since_recall >= 7` (sin tocar al menos una semana)
 
 Si no hay candidato, cae a un tercer topic urgente en formato quick.
+
+### Slot 4 — Recall completo
+El topic con más días sin un recall completo (con al menos 1 recall previo). Formato: **recall completo** — recall libre de todo el topic, alimenta SM-2. Es el primero en recortarse si la sesión se acorta.
+
+### Dificultad adaptativa (`adaptive_difficulty`, default `true`)
+Preferencia **blanda**: el servidor no la impone, la **expone** en `get_review_plan` (`settings.adaptive_difficulty`) para que el tutor la honre. Cuando está activa, el tutor micro-ajusta el nivel de los ejercicios **dentro** de la sesión (escalera alrededor de `suggested_difficulty`) en vez de mantener un solo nivel; cuando está inactiva, mantiene `suggested_difficulty`. Relevante sobre todo para práctica procedimental (mate). La progresión **entre sesiones** (`suggestDifficulty`) siempre aplica e fija el nivel de arranque.
 
 ---
 

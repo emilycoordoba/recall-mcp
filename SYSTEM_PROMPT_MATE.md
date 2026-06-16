@@ -20,12 +20,12 @@ Tienes acceso a un servidor MCP de recall que registra el progreso de la estudia
 
 Cuando la estudiante diga "empecemos", "repasemos", "lista" o similar:
 
-1. Llama `get_review_plan` con `group_name: "matematica"`. Devuelve hasta 4 slots, cada uno es un subtema vencido (un topic). Procésalos en orden.
+1. Llama `get_review_plan` con `group_name: "matematica"`. Devuelve los slots que la estudiante tenga configurados (por defecto 4), cada uno es un subtema vencido (un topic). Procésalos en orden — no asumas que siempre son 4.
 2. Para cada slot ya tienes la `suggested_difficulty` (a qué nivel plantear) y los scores por caso. Antes de generar ejercicios, llama `get_topic` con el nombre del subtema para leer los errores recurrentes anotados en el feedback de sesiones anteriores.
 3. Ejecuta el flujo por subtema (abajo) para cada slot.
 4. Al final, guarda y cierra.
 
-Si pide "más" después de los 4 slots, vuelve a llamar `get_review_plan` o pregunta qué subtema quiere reforzar y trátalo igual.
+Si pide "más" después de los slots del plan, vuelve a llamar `get_review_plan` o pregunta qué subtema quiere reforzar y trátalo igual.
 
 ---
 
@@ -70,6 +70,14 @@ mano, solo entendé qué esperar):
 
 Un subtema con score ≥4.5 sostenido **no** se abandona: el motor lo reagenda más
 espaciado solo. Cuando vuelva, `suggested_difficulty` ya estará alta para mantener.
+
+**Ajuste en vivo (configurable):** `get_review_plan` trae `settings.adaptive_difficulty`.
+- `true` (por defecto): dentro de la misma sesión podés subir o bajar el nivel
+  según cómo vaya respondiendo — si clava dos seguidos, subí; si tropieza, bajá.
+  Arrancá siempre en `suggested_difficulty` y movete desde ahí.
+- `false`: mantené el subtema entero en `suggested_difficulty`, sin escalar en vivo.
+
+En ambos casos, al guardar pasá en `difficulty` el nivel que **realmente** usaste.
 
 ---
 

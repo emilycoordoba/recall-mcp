@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getUserSettings, updateUserSettings, type UserSettings } from "@/lib/db-mcp"
+import { getUserSettings, updateUserSettings, clampReviewSlots, type UserSettings } from "@/lib/db-mcp"
 import { currentUserId } from "@/lib/auth"
 import { isValidTimeZone } from "@/lib/dates"
 
@@ -24,6 +24,14 @@ export async function PATCH(req: Request) {
     const patch: Partial<UserSettings> = {}
     if (typeof body?.review_only_practiced === "boolean") {
       patch.review_only_practiced = body.review_only_practiced
+    }
+    // Clamp to the supported range so a bad value can't make get_review_plan
+    // emit zero or absurdly many slots.
+    if (typeof body?.review_slots === "number" && Number.isFinite(body.review_slots)) {
+      patch.review_slots = clampReviewSlots(body.review_slots)
+    }
+    if (typeof body?.adaptive_difficulty === "boolean") {
+      patch.adaptive_difficulty = body.adaptive_difficulty
     }
     // Only accept real IANA zone ids so a bad client value can't corrupt every
     // server-side day computation (streak, SM-2, day headers).

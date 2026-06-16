@@ -108,6 +108,16 @@ que se logró es ambiguo.
 - Sesiones viejas (difficulty NULL) se tratan como "sin nivel previo" → arrancan
   en 2 y la escalera se reconstruye desde la próxima sesión.
 
+**Configurable (ajustes por usuario):**
+- `adaptive_difficulty` (bool, default true): la progresión *entre sesiones*
+  (`suggestDifficulty`) siempre fija el nivel de arranque; este flag controla la
+  escalera *intra-sesión*. `get_review_plan` lo expone en `settings.adaptive_difficulty`
+  y el prompt de mate lo honra: `true` = sube/baja en vivo desde `suggested_difficulty`;
+  `false` = mantiene el nivel sugerido todo el subtema. Es soft (lo interpreta la IA).
+- `review_slots` (2–6, default 4): cuántos subtemas trae la sesión. Para mate, donde
+  todos los slots son ejercicios quick, se lee como "cuántos subtemas practica por
+  sesión". Server-enforced en `getReviewPlan` (recorta/extiende).
+
 Dashboard (IMPLEMENTADO): la dificultad se muestra solo para topics
 procedimentales (`total_quick_reviews > 0 && total_recalls === 0`, mismo criterio
 que el motor): chip "Dif. N/5" en la lista principal (celda de puntaje), nivel
