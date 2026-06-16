@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Logo } from "@/components/logo"
 import { LogoutButton } from "@/components/logout-button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 // Barra de navegación común a todas las páginas: marca (link al inicio) + nav +
 // salir. Antes cada página repetía su propio header con patrones de navegación
@@ -34,6 +35,7 @@ export function AppHeader({ streak = 0 }: { streak?: number }) {
           </Link>
         ))}
         <LogoutButton />
+        <ThemeToggle />
       </nav>
     </header>
   )
