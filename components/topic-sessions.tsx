@@ -405,6 +405,16 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                     </div>
                     <ScoreBadge score={session.data.overall_score} />
                   </div>
+                  {(() => {
+                    // Subsecciones (tipos de caso) trabajadas, deduplicadas: un
+                    // vistazo de qué se practicó, igual que en /sessions e historial.
+                    const cases = [...new Set(
+                      session.data.answers.map((a) => a.subsection_name).filter(Boolean),
+                    )]
+                    return cases.length > 0 ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{cases.join(" · ")}</p>
+                    ) : null
+                  })()}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {session.data.overall_score !== null && session.data.feedback && (
