@@ -11,7 +11,7 @@ import { getServerSupabase } from "@/lib/supabase-server";
 // externo) para evitar open redirects.
 function safeNext(next: string): string {
   if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
-    return "/";
+    return "/app";
   }
   return next;
 }
@@ -19,14 +19,14 @@ function safeNext(next: string): string {
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = safeNext(String(formData.get("next") ?? "/") || "/");
+  const next = safeNext(String(formData.get("next") ?? "/app") || "/app");
 
   const supabase = await getServerSupabase();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     const params = new URLSearchParams({ error: "1" });
-    if (next !== "/") params.set("next", next);
+    if (next !== "/app") params.set("next", next);
     redirect(`/login?${params.toString()}`);
   }
 

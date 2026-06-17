@@ -17,7 +17,7 @@ const NAV = [
 export function AppHeader({ streak = 0 }: { streak?: number }) {
   return (
     <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <Link href="/" aria-label="Ir al inicio" className="w-fit">
+      <Link href="/app" aria-label="Ir al inicio" className="w-fit">
         <Logo />
       </Link>
       <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">

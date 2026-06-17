@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Recall",
     short_name: "Recall",
     description: "Sistema de active recall personal — repasá temas y seguí tu progreso.",
-    start_url: "/",
+    start_url: "/app",
     display: "standalone",
     background_color: "#ffffff",
     theme_color: "#ffffff",

@@ -76,5 +76,5 @@ export async function signup(formData: FormData) {
   const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
   if (signInErr) redirect("/login");
 
-  redirect("/");
+  redirect("/app");
 }
