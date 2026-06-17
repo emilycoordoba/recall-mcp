@@ -1366,17 +1366,24 @@ export async function getReviewPlan(
       avg_score: s4.avg_score, total_recalls: s4.total_recalls,
     });
   } else {
-    const fallback = candidates.find((c) => !used.has(c.topic_id));
-    if (fallback) {
-      used.add(fallback.topic_id);
-      const fbTarget = weakestQuickSubsection(fallback);
+    // Sin candidato de recall completo (grupos 100% procedimentales como mate, donde
+    // total_recalls = 0): el equivalente procedimental de un recall completo es un
+    // quick que BARRE TODOS los tipos de caso del tema (no solo el más flojo, como
+    // los slots 1-3). Elegimos el tema con más días sin repaso — el análogo directo
+    // de cómo el slot 4 conceptual ordena por days_since_full_recall. Se señala con
+    // purpose=full_recall + target_subsections (todas); el tutor da ≥1 ejercicio por
+    // caso. Ver SYSTEM_PROMPT_MATE "repaso integral".
+    const sweep = candidates
+      .filter((c) => !used.has(c.topic_id))
+      .sort((a, b) => (b.days_since_recall ?? Infinity) - (a.days_since_recall ?? Infinity))[0];
+    if (sweep) {
+      used.add(sweep.topic_id);
       slots.push({
-        slot: 4, purpose: "fallback", format: "quick",
-        topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
-        days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
-        avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
-        target_subsection: fbTarget,
-        recent_questions: recentQuestionsFor(fallback, fbTarget),
+        slot: 4, purpose: "full_recall", format: "quick",
+        topic_id: sweep.topic_id, topic_name: sweep.topic_name, group_name: sweep.group_name,
+        days_since_recall: sweep.days_since_recall, days_since_full_recall: sweep.days_since_full_recall,
+        avg_score: sweep.avg_score, total_recalls: sweep.total_recalls,
+        target_subsections: sweep.subsections.map((s) => s.name),
       });
     }
   }
