@@ -192,7 +192,7 @@ export function createMcpServer(userId: number): McpServer {
 
   server.tool(
     "save_quick_review",
-    "Guarda una sesión de quick review: 3 preguntas curadas con sus respuestas y scores.",
+    "Guarda una sesión de quick review: preguntas curadas con sus respuestas y scores. IMPORTANTE: pasá la dificultad usada en el param `difficulty` (1-5) — NO la escribas en el feedback como texto.",
     {
       topic_name:    z.string().describe("Nombre exacto del topic"),
       overall_score: z.number().min(0).max(5).describe("Score global (0.0–5.0)"),
@@ -221,7 +221,7 @@ export function createMcpServer(userId: number): McpServer {
             session_id: result.session_id,
             topic_id: result.topic_id,
             overall_score: input.overall_score,
-            difficulty: input.difficulty ?? null,
+            difficulty: result.difficulty,
           }, null, 2),
         }],
       };

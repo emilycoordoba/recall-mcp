@@ -109,6 +109,8 @@ Preferencia **blanda**: el servidor no la impone, la **expone** en `get_review_p
 
 El **ritmo** (`difficulty_pace`: `suave`/`normal`/`exigente`, default `normal`) modula qué tan rápido escala esa escalera en vivo: `suave` sube tras 3 aciertos seguidos y baja ante cualquier tropiezo; `normal` sube tras 2 y baja con score <3; `exigente` sube con 1 acierto ≥4.5 y tolera más antes de bajar. Es también blando (lo interpreta el tutor); **no** altera la regla entre-sesiones de `suggestDifficulty`.
 
+**La dificultad es un dato, no texto** — `save_quick_review` la recibe en el param `difficulty` (1-5) y la guarda en `quick_review_sessions.difficulty`. El modelo a veces la omite y la escribe como prosa en el feedback ("Dificultad: 3/5"); hay **dos redes de seguridad** para no perder el dato: (1) un fallback en `saveQuickReview` que la rescata del feedback con `parseDifficultyFromText` (`lib/difficulty.ts`) cuando el param viene vacío, y (2) edición manual en el dashboard (el badge violeta del historial del topic es un selector 1-5 + "Sin dificultad", vía `PATCH /api/quick-reviews/[id]`).
+
 ---
 
 ## Clasificación teórico/práctico
