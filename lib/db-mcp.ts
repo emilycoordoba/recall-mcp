@@ -121,6 +121,12 @@ export interface UserSettings {
   // enforced — get_review_plan returns exactly this many slots when there are
   // enough candidates.
   review_slots: number;
+  // When true, review_slots is treated as a *cap* and the session is sized to how
+  // many topics are actually due that day (SM-2 days_overdue >= 0), bounded by
+  // [REVIEW_SLOTS_MIN, review_slots]. Light days get short sessions, busy days fill
+  // up to the cap, and the length self-adjusts as mastery stretches intervals.
+  // When false, every session emits exactly review_slots. See getReviewPlan.
+  review_slots_auto: boolean;
   // When true, the tutor adjusts exercise difficulty live within a session (a
   // staircase around suggested_difficulty) instead of holding one level. The
   // server only surfaces the flag in get_review_plan; the model honors it. Mainly
@@ -149,6 +155,7 @@ export const clampReviewSlots = (n: number) =>
 export const DEFAULT_SETTINGS: UserSettings = {
   review_only_practiced: true,
   review_slots: 4,
+  review_slots_auto: false,
   adaptive_difficulty: true,
   difficulty_pace: "normal",
   timezone: DEFAULT_TIMEZONE,
@@ -957,6 +964,41 @@ export async function deleteRecall(recallId: number, userId: number) {
   return { success: true, deleted_recall_id: recallId, topic_id: data.topic_id };
 }
 
+// Deletes only the review-session "envelope": its slots and the session row. The
+// underlying recalls / quick reviews are *unlinked* (review_session_id → null),
+// never deleted — they're the user's real practice history and must survive. We
+// unlink before deleting so this is safe regardless of the FK's ON DELETE mode
+// (no row still references the session by the time it's removed).
+export async function deleteReviewSession(sessionId: number, userId: number) {
+  await supabase
+    .from("recalls")
+    .update({ review_session_id: null })
+    .eq("review_session_id", sessionId)
+    .eq("user_id", userId);
+  await supabase
+    .from("quick_review_sessions")
+    .update({ review_session_id: null })
+    .eq("review_session_id", sessionId)
+    .eq("user_id", userId);
+  await supabase
+    .from("review_session_slots")
+    .delete()
+    .eq("session_id", sessionId)
+    .eq("user_id", userId);
+
+  const { data, error } = await supabase
+    .from("review_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: `Sesión #${sessionId} no encontrada` };
+  return { success: true, deleted_session_id: sessionId };
+}
+
 export async function mergeTopics(sourceName: string, targetName: string, userId: number) {
   const source = await getTopicByName(sourceName, userId);
   const target = await getTopicByName(targetName, userId);
@@ -1232,7 +1274,15 @@ export async function getReviewPlan(
   // canonical session; trimming drops the deeper formats first (full recall, then
   // consolidation), and counts above 4 append extra "urgent quick" picks from the
   // remaining candidates. Server-enforced so the model never decides how many.
-  const targetSlots = clampReviewSlots(settings.review_slots ?? DEFAULT_SETTINGS.review_slots);
+  //
+  // With auto-sizing on, review_slots is a *cap*: the session tracks how many
+  // topics are actually due (days_overdue >= 0) within [MIN, cap], so it shrinks
+  // on light days and self-adjusts as intervals stretch. `candidates` is already
+  // the practiced, in-scope pool.
+  const slotCap = clampReviewSlots(settings.review_slots ?? DEFAULT_SETTINGS.review_slots);
+  const targetSlots = settings.review_slots_auto
+    ? Math.min(slotCap, Math.max(REVIEW_SLOTS_MIN, candidates.filter((c) => c.days_overdue >= 0).length))
+    : slotCap;
   if (slots.length > targetSlots) {
     slots.length = targetSlots;
   } else {

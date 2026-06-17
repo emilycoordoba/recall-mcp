@@ -80,6 +80,8 @@ Casos especiales:
 `get_review_plan` devuelve, por defecto, **4 slots** de propósito fijo. Cada slot usa un topic distinto.
 
 > **Cantidad configurable (`review_slots`, 2–6, default 4).** Los 4 slots de propósito se construyen siempre y luego el servidor **recorta desde el final** (4→3 quita el recall completo, 3→2 quita la consolidación) o **extiende** con slots "quick urgentes" extra (5, 6) si hay candidatos. Es server-enforced: el modelo nunca decide cuántos. Se ajusta en `/settings`.
+>
+> **Ajuste automático (`review_slots_auto`, default false).** Cuando está activo, `review_slots` pasa a ser un **tope** y la sesión se dimensiona a cuántos topics están **vencidos** ese día (`days_overdue >= 0`, vía SM-2), acotado a `[REVIEW_SLOTS_MIN, review_slots]`. Días tranquilos → sesiones cortas; días con backlog → hasta el tope; y se acorta solo a medida que los intervalos se estiran con el dominio. No intenta cubrir *todos* los temas (eso pelearía con la repetición espaciada), solo los que tocan.
 
 ### Slot 1 — Más urgente
 El topic con mayor `urgency`. Formato: **quick** (1 pregunta sobre la subsección con menor avg_score). Tiene cooldown: un topic que fue slot 1 en las últimas 2 sesiones no vuelve a serlo.

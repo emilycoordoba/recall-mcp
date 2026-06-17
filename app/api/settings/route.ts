@@ -30,6 +30,9 @@ export async function PATCH(req: Request) {
     if (typeof body?.review_slots === "number" && Number.isFinite(body.review_slots)) {
       patch.review_slots = clampReviewSlots(body.review_slots)
     }
+    if (typeof body?.review_slots_auto === "boolean") {
+      patch.review_slots_auto = body.review_slots_auto
+    }
     if (typeof body?.adaptive_difficulty === "boolean") {
       patch.adaptive_difficulty = body.adaptive_difficulty
     }

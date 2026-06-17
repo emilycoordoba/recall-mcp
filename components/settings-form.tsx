@@ -102,8 +102,12 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
       />
 
       <Row
-        title="Temas por sesión de repaso"
-        description="Cuántos temas trae cada sesión. Menos = sesiones más cortas (se recortan primero el recall completo y la consolidación); más = sesiones más largas."
+        title={settings.review_slots_auto ? "Máximo de temas por sesión" : "Temas por sesión de repaso"}
+        description={
+          settings.review_slots_auto
+            ? "Con el ajuste automático activo, la sesión nunca pasa de este tope (en días tranquilos trae menos)."
+            : "Cuántos temas trae cada sesión. Menos = sesiones más cortas (se recortan primero el recall completo y la consolidación); más = sesiones más largas."
+        }
         control={
           <Select
             value={String(settings.review_slots)}
@@ -121,6 +125,18 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
               ))}
             </SelectContent>
           </Select>
+        }
+      />
+
+      <Row
+        title="Ajustar la cantidad automáticamente"
+        description="Cuando está activo, el tamaño de cada sesión se ajusta a cuántos temas tienes vencidos ese día (sin pasar del máximo de arriba). Días tranquilos = sesiones más cortas; y se acorta solo a medida que dominas los temas."
+        control={
+          <Toggle
+            checked={settings.review_slots_auto}
+            disabled={saving}
+            onChange={(v) => update({ review_slots_auto: v })}
+          />
         }
       />
 
