@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button"
 import { IconTrash } from "@tabler/icons-react"
 import { TopicGroups, type GroupRef } from "@/components/topic-groups"
 import { DifficultyBadge } from "@/components/difficulty-badge"
+import { TopicKindBadge } from "@/components/topic-kind-badge"
 import { useConfirm } from "@/components/confirm-dialog"
+import type { TopicKind } from "@/lib/topic-kind"
 
 interface Topic {
   id: number
   name: string
   description: string | null
   groups: GroupRef[]
+  kind: TopicKind
 }
 
 export function TopicDetailHeader({
@@ -130,6 +133,7 @@ export function TopicDetailHeader({
               </span>
             </h1>
           )}
+          <TopicKindBadge kind={topic.kind} />
         </div>
 
         <Button

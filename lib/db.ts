@@ -1,5 +1,6 @@
 import { getServerSupabase } from "./supabase-server";
 import { suggestDifficulty } from "./difficulty";
+import { deriveTopicKind, smScheduleSource, type SubsectionKind, type TopicKind } from "./topic-kind";
 import { DEFAULT_TIMEZONE, dayInTz, addDays } from "./dates";
 
 const RECENT_WINDOW = 5;
@@ -69,6 +70,8 @@ export interface TopicRow {
   // Conjunto completo de grupos (muchos-a-muchos). `group_name`/`group_id` son el
   // grupo "primario"; `groups` los incluye a todos (para filtros/edición en el dashboard).
   groups: GroupRef[];
+  // Tipo del tema derivado de los kinds de sus subsecciones (lib/topic-kind.ts).
+  kind: TopicKind;
   last_score: number | null;
   last_recalled_at: string | null;
   total_recalls: number;
@@ -93,6 +96,7 @@ export interface TopicDetail {
   group_id: number | null;
   group_name: string | null;
   groups: GroupRef[];
+  kind: TopicKind;
 }
 
 export interface Subsection {
@@ -100,6 +104,7 @@ export interface Subsection {
   topic_id: number;
   name: string;
   order_index: number;
+  kind: SubsectionKind;
 }
 
 export interface RecallRow {
@@ -167,6 +172,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
     .select(`
       id, name, description, created_at, group_id,
       topic_groups!topics_group_id_fkey(name),
+      topic_subsections(kind),
       recalls(overall_score, recalled_at, format),
       quick_review_sessions(reviewed_at, overall_score, difficulty)
     `)
@@ -184,6 +190,10 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
   return (data ?? []).map((t) => {
     const recalls = (t.recalls as { overall_score: number; recalled_at: string; format: string | null }[]) ?? [];
     const qrs = (t.quick_review_sessions as { reviewed_at: string; overall_score: number; difficulty: number | null }[]) ?? [];
+
+    // Tipo del tema derivado de los kinds de sus subsecciones (mismo criterio que db-mcp.ts).
+    const subKinds = ((t.topic_subsections as { kind: SubsectionKind | null }[]) ?? []).map((s) => s.kind ?? "teoria");
+    const topicKind = deriveTopicKind(subKinds);
 
     // Procedural-practice difficulty (math): reconstruct from quick reviews, newest first.
     const { last: last_difficulty, suggested: suggested_difficulty } = suggestDifficulty(
@@ -233,20 +243,13 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       score_trend = diff > 0.3 ? "up" : diff < -0.3 ? "down" : "flat";
     }
 
-    // SM-2 source + ladder depend on practice type (mirrors lib/db-mcp.ts):
-    //  - full recalls (conceptual): ladder [3, 14, ×EF], reset 3.
-    //  - quick-review-only (procedural practice): SM-2 fed by quick reviews,
-    //    dense ladder [1, 3, 7, 16, ×EF], reset 1.
+    // SM-2 source + ladder según el tipo del tema (lib/topic-kind.ts, compartido
+    // con db-mcp.ts para que la regla no se duplique a mano).
     const fullRecalls = recalls
       .filter((r) => (r.format ?? "completo") === "completo")
       .map((r) => ({ date: r.recalled_at, q: r.overall_score ?? 0 }));
-    const useRecalls = fullRecalls.length > 0;
-    const smSource = (useRecalls
-      ? fullRecalls
-      : qrs.map((q) => ({ date: q.reviewed_at, q: q.overall_score ?? 0 }))
-    ).sort((a, b) => a.date.localeCompare(b.date));
-    const ladder = useRecalls ? [3, 14] : [1, 3, 7, 16];
-    const failReset = useRecalls ? 3 : 1;
+    const quickReviews = qrs.map((q) => ({ date: q.reviewed_at, q: q.overall_score ?? 0 }));
+    const { source: smSource, ladder, failReset } = smScheduleSource(topicKind, fullRecalls, quickReviews);
 
     let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
     for (const s of smSource) {
@@ -293,6 +296,7 @@ export async function getTopics(userId: number): Promise<TopicRow[]> {
       group_id: t.group_id,
       group_name: (t.topic_groups as unknown as { name: string } | null)?.name ?? null,
       groups: groupsMap.get(t.id) ?? [],
+      kind: topicKind,
       last_score,
       last_recalled_at: lastRecalledAt,
       total_recalls: recalls.length,
@@ -313,7 +317,7 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
   const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topics")
-    .select("id, name, description, created_at, group_id, topic_groups!topics_group_id_fkey(name)")
+    .select("id, name, description, created_at, group_id, topic_groups!topics_group_id_fkey(name), topic_subsections(kind)")
     .eq("id", id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -322,6 +326,7 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
   if (!data) return undefined;
 
   const groupsMap = await groupsByTopic([data.id], userId);
+  const subKinds = ((data.topic_subsections as { kind: SubsectionKind | null }[]) ?? []).map((s) => s.kind ?? "teoria");
 
   return {
     id: data.id,
@@ -331,6 +336,7 @@ export async function getTopic(id: number, userId: number): Promise<TopicDetail 
     group_id: data.group_id,
     group_name: (data.topic_groups as unknown as { name: string } | null)?.name ?? null,
     groups: groupsMap.get(data.id) ?? [],
+    kind: deriveTopicKind(subKinds),
   };
 }
 
@@ -372,6 +378,7 @@ interface SubStatRow {
   topic_id: number;
   name: string;
   order_index: number;
+  kind: SubsectionKind | null;
   recall_subsections: { recall_id: number; covered: boolean; score: number | null }[];
   quick_review_answers: { score: number | null }[];
 }
@@ -419,7 +426,7 @@ export async function getSubsectionStats(topicId: number, userId: number): Promi
   const supabase = await getServerSupabase();
   const { data, error } = await supabase
     .from("topic_subsections")
-    .select("id, topic_id, name, order_index, recall_subsections(recall_id, covered, score), quick_review_answers(score)")
+    .select("id, topic_id, name, order_index, kind, recall_subsections(recall_id, covered, score), quick_review_answers(score)")
     .eq("topic_id", topicId)
     .eq("user_id", userId)
     .order("order_index");
@@ -435,7 +442,7 @@ export async function getSubsectionStats(topicId: number, userId: number): Promi
     const practice_count = allScores.length;
     const avg_score = allScores.length ? allScores.reduce((a: number, b: number) => a + b, 0) / allScores.length : null;
     const mastered = practice_count >= RECENT_WINDOW && avg_score !== null && avg_score >= 4.5 && recallMisses === 0;
-    return { id: s.id, topic_id: s.topic_id, name: s.name, order_index: s.order_index, practice_count, avg_score, mastered };
+    return { id: s.id, topic_id: s.topic_id, name: s.name, order_index: s.order_index, kind: (s.kind ?? "teoria") as SubsectionKind, practice_count, avg_score, mastered };
   });
 }
 

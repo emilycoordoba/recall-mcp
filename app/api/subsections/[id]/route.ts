@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { updateSubsectionNameById } from "@/lib/db-mcp"
+import { updateSubsectionNameById, updateSubsectionKindById } from "@/lib/db-mcp"
+import { isSubsectionKind } from "@/lib/topic-kind"
 import { currentUserId } from "@/lib/auth"
 
 export const dynamic = "force-dynamic"
@@ -16,12 +17,26 @@ export async function PATCH(
     }
 
     const body = await req.json()
+    const userId = await currentUserId()
+
+    // PATCH soporta dos campos independientes: renombrar (name) y reclasificar (kind).
+    if (body?.kind !== undefined) {
+      if (!isSubsectionKind(body.kind)) {
+        return NextResponse.json({ error: "kind inválido" }, { status: 400 })
+      }
+      const result = await updateSubsectionKindById(subId, body.kind, userId)
+      if (!result.success) {
+        return NextResponse.json({ error: result.error }, { status: 409 })
+      }
+      return NextResponse.json({ ok: true })
+    }
+
     const name = typeof body?.name === "string" ? body.name.trim() : ""
     if (!name) {
       return NextResponse.json({ error: "El nombre no puede estar vacío" }, { status: 400 })
     }
 
-    const result = await updateSubsectionNameById(subId, name, await currentUserId())
+    const result = await updateSubsectionNameById(subId, name, userId)
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 409 })
     }

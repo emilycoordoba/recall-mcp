@@ -63,6 +63,8 @@ When the user agrees to do a recall:
    ```
    Then call `save_topic_subsections` immediately with the topic name and subsection list. This persists the ground truth before the user speaks.
 
+   **Classify each subsection as `teoria` or `practica`** (see "Clasificación teórico/práctico" below). This drives how the subsection is reviewed later — `teoria` → conceptual question, `practica` → exercise to solve. Pass `kind` per subsection in `save_topic_subsections`, e.g. `{ name: "Blocking / Tiling", kind: "teoria" }`. If the whole topic is homogeneous — a pure-practice subject like math drills, or a pure-theory conceptual topic — pass `default_kind` once instead of tagging each item.
+
 4. **Announce the topic name only.**  Do not reveal the table of contents. Do NOT mention what the user missed or failed in previous recalls — that information only appears in feedback (step 6), never before the recall starts. Mentioning prior failures before the recall converts retrieval into recognition, which weakens long-term memory consolidation. Say:
    > "Okay — what do you remember about [topic name]?"
    Then wait. Let the user speak freely without hints or guiding questions.
@@ -159,6 +161,21 @@ If the topic exists under any of those queries, mention it naturally:
 
 ---
 
+## Clasificación teórico/práctico
+
+Every subsection is one of two kinds, and this is the single source of truth for how it gets reviewed:
+
+- **`teoria`** — conceptual material: mechanisms, definitions, why something works, tradeoffs, contrasts. Reviewed by *asking the user to explain*.
+- **`practica`** — procedural skill that is mastered by *doing*: solving a problem, deriving a result, writing/tracing code, working an exercise. Reviewed by *posing an exercise to solve*, not by asking them to describe it.
+
+The topic's overall type is **derived**, never set by you: all-`teoria` → teórico, all-`practica` → práctico, a mix → teórico-práctico. You only ever classify subsections.
+
+How to decide: ask "is this remembered by *explaining* it, or by *doing* it?" A subsection on "what a derivative is" is `teoria`; "compute the derivative of a product" is `practica`. A subsection on "what a hash map is" is `teoria`; "implement a hash map" is `practica`. When a subject is uniformly one kind (math practice = all `practica`, a pure-concept history topic = all `teoria`), use `default_kind` instead of tagging each item. When genuinely ambiguous, default to `teoria`.
+
+This matters because the SM-2 scheduler treats them differently: practice-heavy material is reviewed on a denser ladder, and a teórico-práctico topic counts **both** explanations and exercises toward its next-review date.
+
+---
+
 ## Review sessions
 
 When the user says "quiero repasar", "sesión de repaso", or similar:
@@ -174,12 +191,15 @@ When the user says "quiero repasar", "sesión de repaso", or similar:
 2. Execute each slot in order. Three possible formats:
 
    **Quick** (`format: "quick"`):
-   - Ask one open-ended question targeting `target_subsection`. Pedagogically purposeful — not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
-   - If `recent_questions` is provided and non-empty, you MUST ask a question that covers a different angle than any of those. Do not reuse or paraphrase them.
-   - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0).
-   - Example:
+   - Check `target_subsection_kind`. If `"practica"`, pose a **concrete exercise to solve** targeting `target_subsection` — a problem, a derivation, a snippet to trace — not "explain X". If `"teoria"` (or absent), ask one open-ended **conceptual** question — pedagogically purposeful, not "tell me about X" but "explain why X causes Y" or "what's the difference between X and Z".
+   - If `recent_questions` is provided and non-empty, you MUST ask a question/exercise that covers a different angle than any of those. Do not reuse or paraphrase them.
+   - After the answer: brief inline feedback (1–2 lines max) + score (0.0–5.0). For `practica`, score the correctness of the *result/procedure*, not how well they described it.
+   - Example (teoría):
    > "Why does naive matrix multiplication cause so many cache misses, and how does blocking solve that?"
    > ✅ Correct on cache misses and blocking. ⚠️ Didn't mention block size tuned to L1/L2. **3.5/5**
+   - Example (práctica):
+   > "Deriva la regla del producto para f(x) = x²·sen(x)."
+   > ✅ Resultado correcto: 2x·sen(x) + x²·cos(x). **5/5**
 
    **Recall dirigido** (`format: "recall_dirigido"`):
    - Announce the subsections from `target_subsections`: *"Cuéntame lo que recuerdas sobre [A] y [B] de [topic]."*
