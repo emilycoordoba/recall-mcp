@@ -11,7 +11,9 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // Corre en todas las páginas (incluye /login para redirigir si ya hay sesión),
-    // pero NO en el endpoint MCP, OAuth ni assets internos.
-    "/((?!api/mcp|api/oauth|authorize|.well-known|_next/static|_next/image|favicon.ico).*)",
+    // pero NO en el endpoint MCP, OAuth, assets internos, ni los archivos públicos
+    // de SEO/PWA (robots, sitemap, imágenes OG/iconos): un crawler sin sesión no
+    // debe ser redirigido a /login al pedirlos.
+    "/((?!api/mcp|api/oauth|authorize|.well-known|robots.txt|sitemap.xml|opengraph-image|twitter-image|manifest.webmanifest|icon.svg|apple-icon.png|_next/static|_next/image|favicon.ico).*)",
   ],
 };

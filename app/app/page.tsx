@@ -5,6 +5,9 @@ import { GroupStatCards, type GroupStat } from "@/components/group-stat-cards"
 import { AppHeader } from "@/components/app-header"
 import { TimezoneSync } from "@/components/timezone-sync"
 
+// Página privada: nunca debe indexarse (refuerza el disallow de robots.txt).
+export const metadata = { robots: { index: false, follow: false } }
+
 function groupStats(topics: TopicRow[]): GroupStat[] {
   // Agrupa por id (no por nombre) para poder borrar el grupo desde la tarjeta.
   const map = new Map<number, { name: string; topics: TopicRow[] }>()

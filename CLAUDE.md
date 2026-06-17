@@ -98,6 +98,9 @@ components/confirm-dialog.tsx  — ConfirmProvider + useConfirm() (reemplaza con
 components/ui/sonner.tsx       — Toaster (sonner) para toasts; toast.error()/toast.success()
 components/ui/                 — shadcn/ui (Badge, Button, Card, Select, Table)
 app/manifest.ts               — Web App Manifest (PWA instalable; iconos en public/ + app/apple-icon.png)
+app/robots.ts · app/sitemap.ts — SEO: /robots.txt y /sitemap.xml (públicos; bloquean/excluyen lo auth-gated)
+app/opengraph-image.tsx · app/twitter-image.tsx — imagen OG/Twitter 1200×630 (marca, vía next/og)
+lib/site.ts                   — URL canónica del sitio + textos de marca para metadata/OG (override NEXT_PUBLIC_SITE_URL)
 app/**/loading.tsx            — skeletons de Suspense por ruta (imitan el layout real); primitivo en components/ui/skeleton.tsx
 app/error.tsx                 — error boundary de ruta (Reintentar)
 SYSTEM_PROMPT.md · SYSTEM_PROMPT_MATE.md — plantillas de system prompt (fuente de verdad de /prompt)
@@ -107,7 +110,13 @@ SYSTEM_PROMPT.md · SYSTEM_PROMPT_MATE.md — plantillas de system prompt (fuent
 `--radius` en `globals.css` (Tailwind v4 deriva sm/md/lg); no hardcodear radios
 fijos. Feedback in-app (no `alert`/`confirm` nativos): `toast.error()`/`toast.success()`
 y `await confirm({…})` vía `useConfirm()`. UI en español (`lang="es"`). Metadata con
-`title` template "%s · Recall" en `app/layout.tsx`. **Responsive**: lista de temas
+`title` template "%s · Recall" en `app/layout.tsx`. **SEO**: el landing `/` es
+público e indexable; `app/layout.tsx` define `metadataBase` + OpenGraph/Twitter +
+keywords; OG image dinámica en `app/opengraph-image.tsx`; `/robots.txt` y
+`/sitemap.xml` por archivo (`app/robots.ts` / `app/sitemap.ts`); JSON-LD
+(`WebApplication`) en el landing; rutas auth-gated en `noindex` + disallow. El
+matcher del middleware **excluye** robots/sitemap/OG/manifest para que un crawler
+sin sesión no sea redirigido a `/login`. **Responsive**: lista de temas
 en tabla (≥md) o tarjetas (<md, `MobileTopicCard`). **PWA** instalable vía
 `app/manifest.ts` (sin offline). Modo claro/oscuro con `next-themes` (toggle en el
 header + atajo `d`). Ver `docs/app.md` → "Sistema visual".
@@ -152,6 +161,9 @@ Variables de entorno necesarias:
 - `OAUTH_ALLOWED_REDIRECT_HOSTS` *(opcional)* — hosts extra permitidos como
   `redirect_uri` en el flujo OAuth (coma-separado). Por defecto se permiten
   loopback + `claude.ai`/`claude.com`/`anthropic.com`. Ver `docs/track-d-auth.md` (D5).
+- `NEXT_PUBLIC_SITE_URL` *(opcional)* — URL canónica del sitio para metadata/OG,
+  sitemap y robots (`lib/site.ts`). Por defecto el alias de prod en Vercel; setéala
+  si conectás un dominio propio.
 
 ## Gotchas
 
