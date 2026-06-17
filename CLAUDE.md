@@ -61,7 +61,7 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 | `/api/groups/[id]` | `DELETE` — borra el grupo entero (no sus topics; repunta el primario). |
 | `/api/subsections/[id]` | `PATCH { name }` — renombra subsección. |
 | `/api/recalls/[id]` | `PATCH { feedback }` · `DELETE`. |
-| `/api/sessions/[id]` | `DELETE` — borra el "sobre" de una sesión de repaso (slots + fila); **desvincula** sus recalls/quick reviews (no los borra). |
+| `/api/sessions/[id]` | `DELETE` — borra el "sobre" de una sesión de repaso (slots + fila); **desvincula** sus recalls/quick reviews (no los borra). La página `/sessions` (`components/session-list.tsx`) oculta por defecto las sesiones **vacías** (0 registros vinculados) con un contador "N vacías ocultas" + toggle para mostrarlas. |
 | `/api/settings` | `GET` / `PATCH` ajustes del usuario actual. |
 | `/api/mcp` (Pages API) | MCP server HTTP — Claude Desktop apunta aquí con Bearer token |
 | `/api/oauth/*` | Endpoints OAuth para autenticación del MCP server |
