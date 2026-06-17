@@ -100,7 +100,9 @@ Un topic que cumpla **los tres** criterios:
 Si no hay candidato, cae a un tercer topic urgente en formato quick.
 
 ### Slot 4 — Recall completo
-El topic con más días sin un recall completo (con al menos 1 recall previo). Formato: **recall completo** — recall libre de todo el topic, alimenta SM-2. Es el primero en recortarse si la sesión se acorta.
+El topic *conceptual* (con al menos 1 recall completo previo) con más días sin un recall completo. Formato: **recall completo** — recall libre de todo el topic, alimenta SM-2. Es el primero en recortarse si la sesión se acorta.
+
+Si no hay candidato conceptual (p.ej. grupos 100% procedimentales como mate, donde los topics solo tienen quick reviews y `total_recalls = 0`), **cae a un quick urgente** — un recall completo no aplica a práctica procedimental.
 
 ### Dificultad adaptativa (`adaptive_difficulty`, default `true`)
 Preferencia **blanda**: el servidor no la impone, la **expone** en `get_review_plan` (`settings.adaptive_difficulty` + `settings.difficulty_pace`) para que el tutor la honre. Cuando está activa, el tutor micro-ajusta el nivel de los ejercicios **dentro** de la sesión (escalera alrededor de `suggested_difficulty`) en vez de mantener un solo nivel; cuando está inactiva, mantiene `suggested_difficulty`. Relevante sobre todo para práctica procedimental (mate). La progresión **entre sesiones** (`suggestDifficulty`) siempre aplica y fija el nivel de arranque.

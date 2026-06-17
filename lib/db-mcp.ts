@@ -1254,12 +1254,16 @@ export async function getReviewPlan(
     }
   }
 
-  // Slot 4: recall completo — el topic con más días sin recall completo (≥1 recall previo)
-  // Sorted by days_since_full_recall desc (null = nunca → máxima prioridad)
+  // Slot 4: recall completo — el topic con más días sin recall completo (≥1 recall previo).
+  // Sorted by days_since_full_recall desc (null = nunca → máxima prioridad).
+  // Solo aplica a topics *conceptuales* (con al menos un recall completo). En grupos
+  // 100% procedimentales (p.ej. mate: los topics solo tienen quick reviews, total_recalls
+  // = 0) no hay candidato y un "recall completo" — "contame todo lo que recordás de
+  // fracciones" — no tiene sentido: cae a un quick urgente como los demás slots.
   const fullRecallPool = candidates
     .filter((c) => !used.has(c.topic_id) && c.total_recalls >= 1)
     .sort((a, b) => (b.days_since_full_recall ?? Infinity) - (a.days_since_full_recall ?? Infinity));
-  const s4 = fullRecallPool[0] ?? candidates.find((c) => !used.has(c.topic_id));
+  const s4 = fullRecallPool[0];
   if (s4) {
     used.add(s4.topic_id);
     slots.push({
@@ -1268,6 +1272,20 @@ export async function getReviewPlan(
       days_since_recall: s4.days_since_recall, days_since_full_recall: s4.days_since_full_recall,
       avg_score: s4.avg_score, total_recalls: s4.total_recalls,
     });
+  } else {
+    const fallback = candidates.find((c) => !used.has(c.topic_id));
+    if (fallback) {
+      used.add(fallback.topic_id);
+      const fbTarget = weakestQuickSubsection(fallback);
+      slots.push({
+        slot: 4, purpose: "fallback", format: "quick",
+        topic_id: fallback.topic_id, topic_name: fallback.topic_name, group_name: fallback.group_name,
+        days_since_recall: fallback.days_since_recall, days_since_full_recall: fallback.days_since_full_recall,
+        avg_score: fallback.avg_score, total_recalls: fallback.total_recalls,
+        target_subsection: fbTarget,
+        recent_questions: recentQuestionsFor(fallback, fbTarget),
+      });
+    }
   }
 
   // Honor the user's configured slot count. The 4 purposeful slots above are the
