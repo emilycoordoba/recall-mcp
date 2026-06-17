@@ -2,6 +2,7 @@
 // nivel app (`.eq("user_id", …)`) y el Bearer token ya scopea al usuario.
 import { supabaseAdmin as supabase } from "./supabase-admin";
 import { suggestDifficulty } from "./difficulty";
+import { deriveTopicKind, smScheduleSource, type SubsectionKind, type TopicKind } from "./topic-kind";
 import { DEFAULT_TIMEZONE, dayInTz, addDays } from "./dates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,7 +27,10 @@ export interface SaveRecallInput {
 export interface SaveTopicSubsectionsInput {
   topic_name: string;
   group_name?: string;
-  subsections: string[];
+  // Tipo aplicado a las subsecciones NUEVAS de este guardado cuando no traen un
+  // `kind` propio. No reclasifica subsecciones ya existentes (ver saveTopicSubsections).
+  default_kind?: SubsectionKind;
+  subsections: { name: string; kind?: SubsectionKind }[];
 }
 
 export interface QuickReviewAnswerInput {
@@ -73,6 +77,10 @@ export interface ReviewCandidate {
   // quick-review-only topic (e.g. math practice) has total_recalls 0 but
   // total_sessions > 0 — this is the field that means "practiced at least once".
   total_sessions: number;
+  // Tipo del tema DERIVADO de los kinds de sus subsecciones (lib/topic-kind.ts).
+  // Le dice al tutor cómo conducir la sesión: teórico → recall conceptual,
+  // práctico → ejercicios, teórico-práctico → ambos.
+  kind: TopicKind;
   next_review_date: string | null;
   days_overdue: number;
   sm2_interval: number;
@@ -81,7 +89,7 @@ export interface ReviewCandidate {
   // suggested_difficulty = what to pose next, computed from recent scores.
   last_difficulty: number | null;
   suggested_difficulty: number;
-  subsections: { name: string; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
+  subsections: { name: string; kind: SubsectionKind; avg_score: number | null; times_missed: number; mastered: boolean; recent_questions: string[] }[];
 }
 
 // ─── User resolution ──────────────────────────────────────────────────────────
@@ -342,7 +350,10 @@ export async function getTopicHistory(topicId: number, userId: number) {
     }),
   );
 
-  return { ...topic, subsections: subsections ?? [], recalls: recallsWithSubs };
+  const subs = subsections ?? [];
+  const kind = deriveTopicKind(subs.map((s) => (s.kind ?? "teoria") as SubsectionKind));
+
+  return { ...topic, kind, subsections: subs, recalls: recallsWithSubs };
 }
 
 export async function listTopics(userId: number, groupName?: string) {
@@ -406,6 +417,7 @@ const RECENT_WINDOW = 5;
 // embeds loosely (often as arrays), so we assert this via `unknown` at the cast.
 interface CandidateSubRow {
   name: string;
+  kind: SubsectionKind | null;
   recall_subsections: { recall_id: number; covered: boolean; score: number }[];
   quick_review_answers: { session_id: number; score: number; question: string | null }[];
 }
@@ -429,7 +441,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
       recalls(id, recalled_at, overall_score, format),
       quick_review_sessions(id, reviewed_at, overall_score, difficulty),
       topic_subsections(
-        id, name,
+        id, name, kind,
         recall_subsections(recall_id, covered, score),
         quick_review_answers(session_id, score, question)
       )
@@ -458,6 +470,10 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
     .map((t) => {
       const recalls: { id: number; recalled_at: string; overall_score: number; format: string | null }[] = t.recalls ?? [];
       const qrs: { id: number; reviewed_at: string; overall_score: number; difficulty: number | null }[] = t.quick_review_sessions ?? [];
+
+      // Tipo del tema derivado de los kinds de sus subsecciones (filas viejas sin
+      // kind → 'teoria' por el default de la columna; el ?? cubre el caso null).
+      const topicKind = deriveTopicKind((t.topic_subsections ?? []).map((s) => s.kind ?? "teoria"));
 
       // Procedural-practice difficulty (math): reconstruct from quick reviews,
       // newest first, so the plan can hand Claude a ready-computed next level.
@@ -502,24 +518,17 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
           ? 999
           : urgencyDays / ((avgScore ?? 0) + 1) / consolidation;
 
-      // SM-2 source + interval ladder depend on practice type:
-      //  - Topics with full recalls (conceptual, e.g. Emily): unchanged ladder
-      //    [3, 14, ×EF], reset 3 — directed recalls excluded (partial retention).
-      //  - Topics with only quick reviews (procedural practice, e.g. Lesty's
-      //    math): SM-2 is fed by quick reviews with a *dense* ladder
-      //    [1, 3, 7, 16, ×EF], reset 1 — mass early, stretch once mechanized.
-      // Without this, a quick-review-only topic never advances any interval and
-      // scheduling degrades to pure recency (no real spaced repetition).
+      // SM-2 source + interval ladder depend on the topic's kind (lib/topic-kind.ts):
+      //  - teorico: full recalls drive it (ladder [3,14], reset 3); falls back to
+      //    quick reviews + dense ladder while there are no recalls yet.
+      //  - practico (math): quick reviews, dense ladder [1,3,7,16], reset 1.
+      //  - teorico_practico: recalls AND quick reviews merged — both advance the
+      //    schedule (fixes the bug where one full recall silenced the exercises).
       const fullRecalls = recalls
         .filter((r) => (r.format ?? "completo") === "completo")
         .map((r) => ({ date: r.recalled_at, q: r.overall_score ?? 0 }));
-      const useRecalls = fullRecalls.length > 0;
-      const smSource = (useRecalls
-        ? fullRecalls
-        : qrs.map((q) => ({ date: q.reviewed_at, q: q.overall_score ?? 0 }))
-      ).sort((a, b) => a.date.localeCompare(b.date));
-      const ladder = useRecalls ? [3, 14] : [1, 3, 7, 16];
-      const failReset = useRecalls ? 3 : 1;
+      const quickReviews = qrs.map((q) => ({ date: q.reviewed_at, q: q.overall_score ?? 0 }));
+      const { source: smSource, ladder, failReset } = smScheduleSource(topicKind, fullRecalls, quickReviews);
 
       let sm2Interval = 1, sm2EF = 2.5, sm2Reps = 0;
       for (const s of smSource) {
@@ -574,7 +583,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
           .slice(0, 5)
           .map((q) => q.question)
           .filter((q): q is string => q !== null);
-        return { name: s.name, avg_score, times_missed, mastered, recent_questions };
+        return { name: s.name, kind: (s.kind ?? "teoria") as SubsectionKind, avg_score, times_missed, mastered, recent_questions };
       }).sort((a, b) => (a.avg_score ?? 999) - (b.avg_score ?? 999));
 
       return {
@@ -587,6 +596,7 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
         urgency: Math.round(urgency * 100) / 100,
         total_recalls: recalls.length,
         total_sessions: recalls.length + qrs.length,
+        kind: topicKind,
         next_review_date: nextReviewDate,
         days_overdue: daysOverdue,
         sm2_interval: sm2Interval,
@@ -604,13 +614,39 @@ export async function saveTopicSubsections(input: SaveTopicSubsectionsInput, use
   const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
   const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
 
-  // Upsert with correct order (updates order_index on existing subsections too)
+  // Nombres que ya existían antes de este guardado — sirve para aplicar default_kind
+  // SOLO a subsecciones nuevas (nunca reclasificar las que el usuario ya tenía).
+  const { data: before } = await supabase
+    .from("topic_subsections")
+    .select("name")
+    .eq("topic_id", topicId);
+  const existingNames = new Set((before ?? []).map((s) => s.name.toLowerCase()));
+
+  // Upsert de orden/nombre SIN kind: las filas nuevas toman el default de la columna
+  // ('teoria') y las existentes conservan su clasificación (el upsert nunca pisa kind).
   await supabase
     .from("topic_subsections")
     .upsert(
-      input.subsections.map((name, i) => ({ topic_id: topicId, name, order_index: i, user_id: userId })),
+      input.subsections.map((s, i) => ({ topic_id: topicId, name: s.name, order_index: i, user_id: userId })),
       { onConflict: "topic_id,name", ignoreDuplicates: false },
     );
+
+  // Aplica kinds: un `kind` explícito por subsección siempre gana; `default_kind`
+  // solo inicializa subsecciones NUEVAS. Re-guardar una tabla de contenido sin kinds
+  // es un no-op de clasificación, así que una edición manual del dashboard nunca se
+  // revierte en silencio.
+  await Promise.all(
+    input.subsections.map(async (s) => {
+      const isNew = !existingNames.has(s.name.toLowerCase());
+      const kind = s.kind ?? (isNew ? input.default_kind : undefined);
+      if (!kind) return;
+      await supabase
+        .from("topic_subsections")
+        .update({ kind })
+        .eq("topic_id", topicId)
+        .ilike("name", s.name);
+    }),
+  );
 
   // Remove phantom subsections (not in new list, no practice history)
   const { data: existing } = await supabase
@@ -618,7 +654,7 @@ export async function saveTopicSubsections(input: SaveTopicSubsectionsInput, use
     .select("id, name")
     .eq("topic_id", topicId);
 
-  const newNameSet = new Set(input.subsections.map((n) => n.toLowerCase()));
+  const newNameSet = new Set(input.subsections.map((s) => s.name.toLowerCase()));
   const phantoms = (existing ?? []).filter((s) => !newNameSet.has(s.name.toLowerCase()));
 
   await Promise.all(
@@ -762,6 +798,27 @@ export async function updateSubsectionNameById(subsectionId: number, newName: st
 
   if (error) return { success: false, error: error.message };
   return { success: true, subsection_id: subsectionId, new_name: trimmed };
+}
+
+// Reclasifica una subsección (teoria/practica) desde el dashboard. Como las
+// subsecciones no tienen user_id, la propiedad se valida por el topic padre.
+export async function updateSubsectionKindById(subsectionId: number, kind: SubsectionKind, userId: number) {
+  const { data: sub } = await supabase
+    .from("topic_subsections")
+    .select("id, topics!inner(user_id)")
+    .eq("id", subsectionId)
+    .maybeSingle();
+
+  const owner = (sub?.topics as unknown as { user_id: number } | null)?.user_id;
+  if (!sub || owner !== userId) return { success: false, error: "Subsección no encontrada" };
+
+  const { error } = await supabase
+    .from("topic_subsections")
+    .update({ kind })
+    .eq("id", subsectionId);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, subsection_id: subsectionId, kind };
 }
 
 export async function updateRecallFeedback(recallId: number, feedback: string, userId: number) {
@@ -1067,6 +1124,12 @@ export interface ReviewSlot {
   days_since_full_recall: number | null;
   avg_score: number | null;
   total_recalls: number;
+  // Tipo del tema (derivado). Le dice al tutor cómo conducir: teórico → recall
+  // conceptual, práctico → ejercicios, teórico-práctico → ambos.
+  kind?: TopicKind;
+  // Para slots quick: tipo de la subsección objetivo. 'practica' → plantear un
+  // ejercicio a resolver; 'teoria' → pregunta conceptual.
+  target_subsection_kind?: SubsectionKind;
   // Procedural practice (math): level last used and the level to pose now.
   last_difficulty?: number | null;
   suggested_difficulty?: number;
@@ -1322,14 +1385,17 @@ export async function getReviewPlan(
 
   // Attach procedural-practice difficulty to each slot from its candidate, so we
   // don't thread it through all the slot-building branches above.
-  const diffByTopic = new Map(
-    candidates.map((c) => [c.topic_id, { last: c.last_difficulty, suggested: c.suggested_difficulty }]),
-  );
+  const candById = new Map(candidates.map((c) => [c.topic_id, c]));
   for (const slot of slots) {
-    const d = diffByTopic.get(slot.topic_id);
-    if (d) {
-      slot.last_difficulty = d.last;
-      slot.suggested_difficulty = d.suggested;
+    const c = candById.get(slot.topic_id);
+    if (!c) continue;
+    slot.last_difficulty = c.last_difficulty;
+    slot.suggested_difficulty = c.suggested_difficulty;
+    slot.kind = c.kind;
+    // Para slots quick con subsección objetivo, anota su kind para que el tutor
+    // sepa si plantear un ejercicio ('practica') o una pregunta conceptual ('teoria').
+    if (slot.target_subsection) {
+      slot.target_subsection_kind = c.subsections.find((s) => s.name === slot.target_subsection)?.kind;
     }
   }
 

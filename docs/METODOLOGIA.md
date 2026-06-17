@@ -111,6 +111,29 @@ El **ritmo** (`difficulty_pace`: `suave`/`normal`/`exigente`, default `normal`) 
 
 ---
 
+## Clasificación teórico/práctico
+
+Cada subsección tiene un `kind`: **`teoria`** o **`practica`**. Es la **única fuente de verdad** de la naturaleza del contenido; el tipo del topic (`teorico` / `practico` / `teorico_practico`) **se deriva** de sus subsecciones, nunca se almacena:
+
+- todas `teoria` → topic **teórico**
+- todas `practica` → topic **práctico**
+- mezcla → topic **teórico-práctico**
+
+> **Por qué derivado y no almacenado.** Guardar el tipo del topic *y* el de cada subsección serían dos fuentes de verdad que se pueden desincronizar (reclasificas una subsección y el topic queda mintiendo). Derivar elimina esa clase de bug por construcción. El cálculo vive en `deriveTopicKind` (`lib/topic-kind.ts`), compartido por la lib de lectura (`db.ts`) y la de escritura (`db-mcp.ts`).
+
+**Cómo se asigna:** `save_topic_subsections` acepta `kind` por subsección y un `default_kind` opcional para topics homogéneos (p.ej. mate = todo `practica`). El `default_kind` solo **inicializa subsecciones nuevas**; un `kind` explícito siempre gana, y reguardar la tabla de contenido nunca revierte una reclasificación hecha desde el dashboard. Desde el dashboard se cambia con un chip por subsección (`PATCH /api/subsections/[id]` con `{ kind }`).
+
+**Cómo afecta el repaso:**
+- En slots **quick**, el plan anota `target_subsection_kind`: `practica` → el tutor plantea un **ejercicio a resolver**; `teoria` → una **pregunta conceptual**.
+- En el **scheduler SM-2** (selección de escalera y fuente), el `kind` derivado del topic decide qué cuenta como "repaso":
+  - **Teórico** (o aún sin recalls completos): si hay recalls completos usa la escalera conceptual `[3, 14]` (reset 3); si solo hay quick reviews, la escalera densa `[1, 3, 7, 16]` (reset 1).
+  - **Práctico**: escalera densa `[1, 3, 7, 16]` (reset 1) sobre los quick reviews.
+  - **Teórico-práctico**: **fusiona** recalls completos *y* quick reviews en una sola línea temporal y aplica la escalera densa `[1, 3, 7, 16]` (reset 1). Esto corrige el bug donde, en cuanto existía un recall completo, los ejercicios dejaban de contar para la próxima fecha de repaso.
+
+  La lógica vive en `smScheduleSource` (`lib/topic-kind.ts`), también compartida por ambas libs.
+
+---
+
 ## Formatos de sesión
 
 ### Quick review
@@ -131,8 +154,9 @@ El flujo completo: tabla de contenido → "¿qué recuerdas?" → feedback exhau
 ## Gestión de subsecciones
 
 `save_topic_subsections` es la única operación que define la estructura canónica de un topic. Cada vez que se llama:
-- Añade las subsecciones nuevas con `order_index` correcto.
+- Añade las subsecciones nuevas con `order_index` correcto y su `kind` (explícito, o `default_kind`, o el default `teoria`).
 - Actualiza el `order_index` de las existentes (por si la estructura cambió de orden).
+- **No pisa el `kind` de subsecciones existentes** salvo que se pase un `kind` explícito para esa subsección: reguardar la TOC nunca revierte una reclasificación hecha desde el dashboard.
 - Elimina subsecciones que ya no están en la lista **solo si no tienen historial de práctica**. Si tienen `recall_subsections` o `quick_review_answers`, se conservan para no perder el historial.
 
 `save_recall` **no** crea subsecciones. Asume que `save_topic_subsections` ya fue llamado antes (como indica el system prompt).
@@ -149,7 +173,7 @@ El `avg_score` global del dashboard es el promedio del **último score de cada t
 
 ```
 topics
-  └─ topic_subsections          (tabla de contenido canónica)
+  └─ topic_subsections          (tabla de contenido canónica; cada una con kind teoria/practica)
        ├─ recall_subsections     (resultado por subsección en cada recall completo)
        └─ quick_review_answers   (respuesta por subsección en cada quick review)
 

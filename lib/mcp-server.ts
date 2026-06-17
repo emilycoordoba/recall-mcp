@@ -96,7 +96,7 @@ export function createMcpServer(userId: number): McpServer {
 
   server.tool(
     "get_review_plan",
-    "Genera el plan de la sesión de repaso: slots con topic, formato (quick / recall_dirigido / recall_completo) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso. Cada slot trae `suggested_difficulty` (1-5, ya calculado del historial de scores) y `last_difficulty` (la última usada): para práctica de mate, plantea los ejercicios a la dificultad sugerida — no la estimes — y pásala a save_quick_review. El campo `new_topics` lista temas que el usuario aún no ha estrenado (0 sesiones) y que por preferencia NO entran al repaso espaciado: no los incluyas en la sesión salvo que el usuario pida explícitamente estrenarlos; puedes mencionarlos al final como temas pendientes por practicar.",
+    "Genera el plan de la sesión de repaso: slots con topic, formato (quick / recall_dirigido / recall_completo) y subsecciones objetivo ya calculados. Llamar al inicio de cada sesión de repaso. Cada slot trae `kind` (teorico/practico/teorico_practico) y, en slots quick, `target_subsection_kind`: si es 'practica' plantea un EJERCICIO a resolver, si es 'teoria' una pregunta conceptual. Cada slot trae también `suggested_difficulty` (1-5, ya calculado del historial de scores) y `last_difficulty` (la última usada): para subsecciones prácticas, plantea los ejercicios a la dificultad sugerida — no la estimes — y pásala a save_quick_review. El campo `new_topics` lista temas que el usuario aún no ha estrenado (0 sesiones) y que por preferencia NO entran al repaso espaciado: no los incluyas en la sesión salvo que el usuario pida explícitamente estrenarlos; puedes mencionarlos al final como temas pendientes por practicar.",
     { group_name: z.string().optional().describe("Filtrar por grupo. Si se omite, todos.") },
     async ({ group_name }) => {
       const plan = await getReviewPlan(userId, group_name);
@@ -120,16 +120,25 @@ export function createMcpServer(userId: number): McpServer {
 
   server.tool(
     "save_topic_subsections",
-    "Guarda el topic y sus subsecciones canónicas ANTES de pedir el recall al usuario.",
+    "Guarda el topic y sus subsecciones canónicas ANTES de pedir el recall al usuario. Clasifica cada subsección como 'teoria' (se entiende/explica, se evalúa con recall conceptual) o 'practica' (se resuelve con ejercicios). El tipo del TEMA se deriva: solo teoría → teórico, solo práctica → práctico, ambos → teórico-práctico. Usa default_kind para temas homogéneos (mate = todo 'practica') y kind por subsección para temas mixtos (programación, física).",
     {
       topic_name: z.string().describe("Nombre del topic"),
       group_name: z.string().optional().describe("Grupo (ej: 'Python'). Opcional."),
-      subsections: z.array(z.string()).describe("Lista de nombres de subsecciones en orden"),
+      default_kind: z.enum(["teoria", "practica"]).optional().describe("Tipo por defecto para subsecciones NUEVAS sin kind propio. No reclasifica las existentes."),
+      subsections: z.array(z.union([
+        z.string(),
+        z.object({
+          name: z.string(),
+          kind: z.enum(["teoria", "practica"]).optional().describe("'teoria' = conceptual; 'practica' = ejercicios. Omitir para heredar default_kind."),
+        }),
+      ])).describe("Subsecciones en orden. Cada una un string (hereda default_kind) o un objeto {name, kind}."),
     },
-    async (input) => {
+    async ({ topic_name, group_name, default_kind, subsections }) => {
       try {
-        const result = await saveTopicSubsections(input, userId);
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Topic "${input.topic_name}" listo para recall`, ...result }, null, 2) }] };
+        // Normaliza la forma string|objeto a {name, kind?} para la capa de DB.
+        const normalized = subsections.map((s) => (typeof s === "string" ? { name: s } : s));
+        const result = await saveTopicSubsections({ topic_name, group_name, default_kind, subsections: normalized }, userId);
+        return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Topic "${topic_name}" listo para recall`, ...result }, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: JSON.stringify({ success: false, error: String(err) }) }], isError: true };
       }

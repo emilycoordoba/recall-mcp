@@ -74,7 +74,7 @@ export default async function TopicPage({
       <BackButton />
 
       <TopicDetailHeader
-        topic={{ id: topic.id, name: topic.name, description: topic.description, groups: topic.groups }}
+        topic={{ id: topic.id, name: topic.name, description: topic.description, groups: topic.groups, kind: topic.kind }}
         allGroups={allGroups}
         recallCount={recalls.length}
         quickReviewCount={quickReviews.length}

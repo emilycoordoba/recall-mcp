@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/select"
 import { GroupChips, GroupCombobox, type GroupRef } from "@/components/group-editor"
 import { DifficultyBadge } from "@/components/difficulty-badge"
+import { TopicKindBadge } from "@/components/topic-kind-badge"
 import type { TopicRow } from "@/lib/db"
+import type { TopicKind } from "@/lib/topic-kind"
 
 // Práctica procedimental (mate): solo estos topics usan dificultad. Misma
 // condición que el motor SM-2 para elegir la escalera densa (solo quick reviews).
@@ -162,6 +164,7 @@ function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: nu
       <Link href={`/topics/${topic.id}`} className="font-medium underline-offset-4 hover:underline">
         {topic.name}
       </Link>
+      <TopicKindBadge kind={topic.kind} />
       <button
         onClick={startEdit}
         title="Editar nombre"
@@ -359,6 +362,11 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     if (typeof window === "undefined") return "name"
     return (localStorage.getItem("dashboard-sort") as SortKey) ?? "name"
   })
+  const [kind, setKind] = useState<"all" | TopicKind>(() => {
+    if (typeof window === "undefined") return "all"
+    const stored = localStorage.getItem("dashboard-kind")
+    return stored === "teorico" || stored === "practico" || stored === "teorico_practico" ? stored : "all"
+  })
 
   async function handleRename(id: number, newName: string) {
     const prev = localTopics
@@ -510,6 +518,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
 
   const filtered = localTopics
     .filter((t) => group === "all" || t.groups.some((g) => g.name === group))
+    .filter((t) => kind === "all" || t.kind === kind)
     .filter((t) => !search || t.name.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       switch (sort) {
@@ -570,6 +579,18 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
             {groups.map((g) => (
               <SelectItem key={g} value={g}>{g}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={kind} onValueChange={(v) => { const k = v as "all" | TopicKind; setKind(k); localStorage.setItem("dashboard-kind", k) }}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Todos los tipos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los tipos</SelectItem>
+            <SelectItem value="teorico">Teóricos</SelectItem>
+            <SelectItem value="practico">Prácticos</SelectItem>
+            <SelectItem value="teorico_practico">Teórico-prácticos</SelectItem>
           </SelectContent>
         </Select>
 

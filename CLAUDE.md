@@ -48,8 +48,8 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 
 | Ruta | Qué hace |
 |---|---|
-| `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo, ordena. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
-| `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones, borrar topic, y borrar/editar feedback de recalls del historial. |
+| `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo y por **tipo** (teórico/práctico/teórico-práctico), ordena. Cada fila muestra un badge con el tipo derivado. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
+| `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones y **reclasificar su kind** (chip teoría/práctica), borrar topic, y borrar/editar feedback de recalls del historial. Muestra un badge con el tipo derivado del topic (teórico/práctico/teórico-práctico). |
 | `/settings` | Ajustes por usuario: "repaso solo con temas estrenados", **cantidad de temas por sesión** (`review_slots`, 2–6, default 4; server-enforced en `get_review_plan`), **ajuste automático** (`review_slots_auto`: dimensiona la sesión a los temas vencidos hasta el tope `review_slots`) y **dificultad adaptativa en vivo** (`adaptive_difficulty` + `difficulty_pace` suave/normal/exigente, soft prefs que `get_review_plan` expone para que la IA las honre). Ver `docs/METODOLOGIA.md`. |
 | `/prompt` | Muestra las plantillas de system prompt (general/mate) para copiar a Claude Desktop. Estático (sin DB); contenido leído de los `.md` de la raíz. |
 | `/login` · `/signup` | Auth del dashboard (Supabase Auth, email+contraseña). `/signup` crea auth user + fila `users` + `mcp_token`. Logout en `/auth/signout` (POST). |
@@ -59,7 +59,7 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 | `/api/topics/merge` | `POST { sourceId, targetId }` — fusiona el origen en el destino. |
 | `/api/groups` | `GET` — todos los grupos del usuario (selector). |
 | `/api/groups/[id]` | `DELETE` — borra el grupo entero (no sus topics; repunta el primario). |
-| `/api/subsections/[id]` | `PATCH { name }` — renombra subsección. |
+| `/api/subsections/[id]` | `PATCH { name }` — renombra subsección · `PATCH { kind }` — reclasifica teoría/práctica. |
 | `/api/recalls/[id]` | `PATCH { feedback }` · `DELETE`. |
 | `/api/sessions/[id]` | `DELETE` — borra el "sobre" de una sesión de repaso (slots + fila); **desvincula** sus recalls/quick reviews (no los borra). La página `/sessions` (`components/session-list.tsx`) oculta por defecto las sesiones **vacías** (0 registros vinculados) con un contador "N vacías ocultas" + toggle para mostrarlas. |
 | `/api/settings` | `GET` / `PATCH` ajustes del usuario actual. |
@@ -75,6 +75,7 @@ pages/api/mcp.ts               — endpoint MCP HTTP (Streamable, Pages API)
 lib/mcp-server.ts              — definición de tools MCP (usa db-mcp.ts)
 lib/db-mcp.ts                  — queries de escritura a Supabase (save_recall, etc.)
 lib/db.ts                      — queries de lectura a Supabase (dashboard)
+lib/topic-kind.ts              — módulo puro compartido: kind de subsección (teoria/practica), deriveTopicKind y smScheduleSource (selección de escalera SM-2)
 lib/supabase.ts                — cliente Supabase compartido
 app/page.tsx                   — página principal (Server Component)
 app/topics/[id]/page.tsx       — detalle del topic (Server Component)
@@ -82,7 +83,8 @@ components/dashboard-filters.tsx — lista + filtros + renombrar/fusionar/borrar
 components/group-editor.tsx     — GroupCombobox (sin datalist) + GroupChips reutilizables
 components/group-stat-cards.tsx — tarjetas de resumen por grupo con borrar grupo (Client)
 components/topic-detail-header.tsx — header editable del detalle (nombre, descripción, borrar)
-components/subsection-list.tsx — renombrar subsecciones inline
+components/subsection-list.tsx — renombrar subsecciones inline + chip teoría/práctica (toggle optimista)
+components/topic-kind-badge.tsx — badge del tipo derivado del topic (teórico/práctico/teórico-práctico)
 components/topic-sessions.tsx  — historial; borrar recall y editar su feedback
 components/settings-form.tsx   — toggle de ajustes por usuario
 components/app-header.tsx      — AppHeader: nav común (marca + links + salir + toggle de tema) en todas las páginas
@@ -158,6 +160,8 @@ Variables de entorno necesarias:
 **Grupos muchos-a-muchos con "primario" (Track C)** — un topic puede tener varios grupos vía `topic_group_links`, pero `topics.group_id` se conserva como el grupo **primario** (lo que siguen usando las tools MCP, el plan de repaso y stats; la edición multi-grupo es solo del dashboard). Dos consecuencias:
 - **Embeds ambiguos**: al existir dos caminos FK entre `topics` y `topic_groups` (`group_id` directo y vía el join table), PostgREST falla con `PGRST201` en `topic_groups(...)`. Hay que nombrar la FK del primario: `topic_groups!topics_group_id_fkey(name)`. Los grupos completos se leen aparte (`groupsByTopic` en `lib/db.ts`), no por embed.
 - **RLS (Track D)**: `topic_group_links` tiene RLS activo con política `user_id = app_uid()`, igual que el resto del esquema. El dashboard lee/escribe con el cliente **con sesión** (`getServerSupabase`), así que `app_uid()` resuelve y las políticas dejan pasar; el MCP usa `service_role` y salta RLS. Si alguna vez una lectura sale vacía en silencio, sospechar de la sesión (sin `auth.uid()` → `app_uid()` NULL → 0 filas), no de la query.
+
+**Tipo de topic = derivado, nunca almacenado** — el `kind` vive **por subsección** (`topic_subsections.kind`: `'teoria' | 'practica'`, single source of truth). El tipo del topic (`teorico`/`practico`/`teorico_practico`) se calcula con `deriveTopicKind` (`lib/topic-kind.ts`) cada vez que se lee; no hay columna `topics.kind`. Esto evita dos fuentes de verdad que se desincronizan. `smScheduleSource` (mismo módulo) usa ese kind derivado para elegir la escalera SM-2 y la fuente: teórico-práctico **fusiona** recalls completos + quick reviews (corrige el bug donde los ejercicios dejaban de contar tras el primer recall completo). `save_topic_subsections` acepta `kind` por subsección y `default_kind` (solo inicializa nuevas; no pisa reclasificaciones del dashboard). Migración: `migrations/2026-06-16_subsection-kind.sql` (correr a mano en Supabase; backfillea mate→`practica`). Ver `docs/METODOLOGIA.md` → "Clasificación teórico/práctico".
 
 **Sorting del lado del servidor** — la página principal recibe `searchParams` y ordena en el Server Component. `DashboardFilters` solo actualiza los query params via router.
 
