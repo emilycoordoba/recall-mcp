@@ -175,6 +175,75 @@ function RecallFeedback({
   )
 }
 
+// Editable difficulty for a quick review. The MCP tool should store it on save,
+// but the model sometimes drops the param (and writes "Dificultad: N" into the
+// feedback instead). This lets you set/clear it by hand: the badge doubles as a
+// Select trigger; "Sin dificultad" clears it back to null. PATCH /api/quick-reviews/[id].
+function EditableDifficulty({
+  quickReviewId,
+  initial,
+}: {
+  quickReviewId: number
+  initial: number | null
+}) {
+  const router = useRouter()
+  const [level, setLevel] = useState<number | null>(initial)
+  const [busy, setBusy] = useState(false)
+
+  async function commit(next: number | null) {
+    if (next === level) return
+    const prev = level
+    setLevel(next) // optimistic
+    setBusy(true)
+    const res = await fetch(`/api/quick-reviews/${quickReviewId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ difficulty: next }),
+    })
+    setBusy(false)
+    if (!res.ok) {
+      setLevel(prev) // rollback
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? "No se pudo guardar la dificultad")
+    } else {
+      toast.success(next === null ? "Dificultad quitada" : `Dificultad ${next}/5`)
+      router.refresh()
+    }
+  }
+
+  return (
+    <Select
+      value={level === null ? "none" : String(level)}
+      onValueChange={(v) => commit(v === "none" ? null : parseInt(v, 10))}
+      disabled={busy}
+    >
+      <SelectTrigger
+        title="Editar dificultad"
+        className="h-auto w-fit gap-1 border-0 bg-transparent p-0 shadow-none hover:bg-transparent focus-visible:ring-0 disabled:opacity-50"
+      >
+        {level === null ? (
+          <span className="text-xs text-muted-foreground underline-offset-4 hover:underline">
+            + dificultad
+          </span>
+        ) : (
+          <DifficultyBadge level={level} title={`Ejercicios planteados a dificultad ${level}/5 · editar`} />
+        )}
+      </SelectTrigger>
+      {/* position="popper": el trigger es un badge borderless de altura casi nula;
+          el modo item-aligned (default) calcula mal su posición y abre el panel
+          fuera de vista. popper lo ancla debajo del trigger como un dropdown normal. */}
+      <SelectContent position="popper" align="start" className="min-w-28">
+        <SelectItem value="none" className="text-xs">Sin dificultad</SelectItem>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <SelectItem key={n} value={String(n)} className="text-xs">
+            Dif. {n}/5
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 interface Props {
   sessions: Session[]
   subsections: { id: number; name: string }[]
@@ -329,15 +398,23 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                         <IconBolt className="h-3 w-3" />
                         Repaso rápido
                       </Badge>
-                      {session.data.difficulty !== null && (
-                        <DifficultyBadge
-                          level={session.data.difficulty}
-                          title={`Ejercicios planteados a dificultad ${session.data.difficulty}/5`}
-                        />
-                      )}
+                      <EditableDifficulty
+                        quickReviewId={session.data.id}
+                        initial={session.data.difficulty}
+                      />
                     </div>
                     <ScoreBadge score={session.data.overall_score} />
                   </div>
+                  {(() => {
+                    // Subsecciones (tipos de caso) trabajadas, deduplicadas: un
+                    // vistazo de qué se practicó, igual que en /sessions e historial.
+                    const cases = [...new Set(
+                      session.data.answers.map((a) => a.subsection_name).filter(Boolean),
+                    )]
+                    return cases.length > 0 ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">{cases.join(" · ")}</p>
+                    ) : null
+                  })()}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {session.data.overall_score !== null && session.data.feedback && (

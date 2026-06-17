@@ -1,7 +1,7 @@
 // El MCP usa el cliente service-role: SALTA RLS. El aislamiento se mantiene a
 // nivel app (`.eq("user_id", …)`) y el Bearer token ya scopea al usuario.
 import { supabaseAdmin as supabase } from "./supabase-admin";
-import { suggestDifficulty } from "./difficulty";
+import { suggestDifficulty, parseDifficultyFromText } from "./difficulty";
 import { deriveTopicKind, smScheduleSource, type SubsectionKind, type TopicKind } from "./topic-kind";
 import { DEFAULT_TIMEZONE, dayInTz, addDays } from "./dates";
 
@@ -725,9 +725,14 @@ export async function saveQuickReview(input: SaveQuickReviewInput, userId: numbe
   const topic = await getTopicByName(input.topic_name, userId);
   if (!topic) return { success: false as const, error: `Topic "${input.topic_name}" no encontrado` };
 
+  // Fallback: si el modelo no mandó `difficulty` pero la dejó en el texto del
+  // feedback ("Dificultad: 3/5"), la rescatamos para no perder el dato. El param
+  // explícito siempre gana. Ver parseDifficultyFromText en lib/difficulty.ts.
+  const difficulty = input.difficulty ?? parseDifficultyFromText(input.feedback);
+
   const { data: session, error: se } = await supabase
     .from("quick_review_sessions")
-    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null, difficulty: input.difficulty ?? null })
+    .insert({ topic_id: topic.id, user_id: userId, overall_score: input.overall_score, feedback: input.feedback ?? null, review_session_id: input.session_id ?? null, difficulty })
     .select("id")
     .single();
   if (se) throw se;
@@ -751,7 +756,7 @@ export async function saveQuickReview(input: SaveQuickReviewInput, userId: numbe
     }),
   );
 
-  return { success: true as const, session_id: session.id, topic_id: topic.id };
+  return { success: true as const, session_id: session.id, topic_id: topic.id, difficulty };
 }
 
 export async function updateSubsectionName(topicName: string, oldName: string, newName: string, userId: number) {
@@ -833,6 +838,31 @@ export async function updateRecallFeedback(recallId: number, feedback: string, u
   if (error) return { success: false, error: error.message };
   if (!data) return { success: false, error: `Recall #${recallId} no encontrado` };
   return { success: true, updated_recall_id: recallId };
+}
+
+// Sets (or clears, with null) the difficulty of a quick review after the fact.
+// The MCP tool should pass `difficulty` on save, but the model sometimes drops it
+// (and writes "Dificultad: N" into the feedback instead); this lets the dashboard
+// recover the value by hand. `difficulty` is null|1-5 — null = "sin registrar".
+export async function updateQuickReviewDifficulty(
+  quickReviewId: number,
+  difficulty: number | null,
+  userId: number,
+) {
+  if (difficulty !== null && (!Number.isInteger(difficulty) || difficulty < 1 || difficulty > 5)) {
+    return { success: false, error: "La dificultad debe ser null o un entero 1-5" };
+  }
+  const { data, error } = await supabase
+    .from("quick_review_sessions")
+    .update({ difficulty })
+    .eq("id", quickReviewId)
+    .eq("user_id", userId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: false, error: `Quick review #${quickReviewId} no encontrado` };
+  return { success: true, updated_quick_review_id: quickReviewId };
 }
 
 export async function updateTopicById(

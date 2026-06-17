@@ -4,6 +4,16 @@
 
 export const clampDifficulty = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
 
+// Fallback para cuando el modelo NO manda el param `difficulty` en save_quick_review
+// y en su lugar lo escribe como texto en el feedback (su mal hábito recurrente, p.ej.
+// "Dificultad: 3/5" o "Dif. 4"). Rescata ese número (1-5) para no perder el dato.
+// Devuelve null si no encuentra un patrón claro. Toma la primera coincidencia.
+export function parseDifficultyFromText(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const m = text.match(/\b(?:dificultad|dif\.?)\s*:?\s*([1-5])(?:\s*\/\s*5)?\b/i);
+  return m ? Number(m[1]) : null;
+}
+
 // Sugiere la dificultad (1-5) para la *próxima* quick review de un topic, según
 // las reglas de la docente (originalmente prosa en SYSTEM_PROMPT_MATE):
 //   - sin historial            → 2 (básico-medio)
