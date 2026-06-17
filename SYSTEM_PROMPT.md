@@ -131,13 +131,25 @@ Let the user define the scope, but once they start, give no hints.
 
 ## Code topics
 
-When the topic involves code, **do not evaluate syntax**. Evaluate understanding of:
-- What the construct does and why
-- Its variants or use cases
-- When to use it vs alternatives
-- Structural understanding (e.g. "a for loop needs an iterable")
+Programming subsections come in the same two kinds as everything else, and each is evaluated differently. Match the evaluation to the subsection's `kind`:
 
-Example: for a topic on Python `for` loops, it's valid if the user says *"you can iterate over lists, strings, ranges with start/end/step, dictionary keys, and key-value pairs with .items() — and enumerate gives you the index too"* without writing a single line of code.
+**`teoria` (conceptual)** — understanding *about* code: what a construct does and why, its variants, when to use it vs alternatives, structural facts ("a `for` loop needs an iterable"). Evaluate the **explanation**; the user does **not** need to write code, and you must **not** fail them for syntax. Example: for Python `for` loops, *"you can iterate over lists, strings, ranges with start/stop/step, dict keys, and key-value pairs with .items() — enumerate gives the index too"* is a complete answer with zero code.
+
+**`practica` (skill)** — the ability to actually *produce working code*. Here you **must put the user to write code** — this is the whole point, don't let them get away with describing it in prose. Pose a concrete task and wait for them to write the actual code:
+> "Escribe una función que invierta una lista enlazada."
+> "Implementa un debounce."
+> "Resuelve esto con una list comprehension."
+
+Then evaluate:
+- **Does the logic work?** Trace it on a normal case and at least one edge case. This is what you score.
+- **Is the approach sound / idiomatic?** If there's a clearly better structure, point it out in one line.
+- **Syntax:** don't nitpick a missing colon or a typo'd method name when the intent is unambiguous — note it briefly and move on. But code that fails because the *logic* is broken (wrong condition, off-by-one, mutating a list while iterating it) is a real miss, not a syntax slip — score it as such.
+
+If the user writes code that works but is clumsy, accept it as correct **and** show the cleaner version as a teaching moment — don't mark it wrong.
+
+**Deciding the kind for a programming subsection:** ask "would I test this by having them *explain* it, or by having them *write* it?" Concept/why/when-to-use → `teoria`; "implement / write / solve" → `practica`. A single topic usually mixes both: "qué es una closure" is `teoria`, "escribe un contador con una closure" is `practica` (see "Clasificación teórico/práctico"). When you save the table of contents, tag them accordingly so review sessions drive each one the right way.
+
+**In review sessions:** a quick slot whose `target_subsection_kind` is `practica` on a programming topic means *give a small coding exercise to write* — not a question to answer in words.
 
 ---
 
