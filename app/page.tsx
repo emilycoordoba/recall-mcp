@@ -2,11 +2,26 @@ import Link from "next/link"
 import { Logo, LogoMark } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site"
 
 export const metadata = {
-  title: { absolute: "Recall — active recall guiado por Claude" },
-  description:
-    "Claude te explica un tema, vos hacés recall libre, y Recall registra cuánto retenés en el tiempo con repetición espaciada.",
+  title: { absolute: `${SITE_NAME} — ${SITE_TAGLINE}` },
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: { url: "/", title: `${SITE_NAME} — ${SITE_TAGLINE}`, description: SITE_DESCRIPTION },
+}
+
+// Datos estructurados para resultados enriquecidos: Recall como app web educativa.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  applicationCategory: "EducationalApplication",
+  operatingSystem: "Web",
+  inLanguage: "es",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
 }
 
 const STEPS = [
@@ -49,6 +64,10 @@ const FEATURES = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
         <Logo />
         <nav className="flex items-center gap-3 text-sm">
@@ -144,8 +163,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <footer className="mx-auto max-w-5xl px-6 py-10 text-center text-xs text-muted-foreground">
-        <Logo className="opacity-70" /> · Sistema de active recall personal
+      <footer className="mx-auto max-w-5xl px-6 py-10 text-center flex items-center justify-center text-xs text-muted-foreground">
+        <div className="pr-1"><Logo className="opacity-70" /></div>  · Sistema de active recall personal
       </footer>
     </div>
   )
