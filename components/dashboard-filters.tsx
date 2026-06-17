@@ -111,6 +111,15 @@ function NextReviewCell({ daysOverdue, dimmed }: { daysOverdue: number | null; d
   return <span className="text-muted-foreground font-mono text-xs">en {-daysOverdue}d</span>
 }
 
+// El color rojo de "vencido" solo se justifica cuando el agendado se apoya en
+// datos suficientes (≥2 prácticas). Antes se medía con total_recalls, pero los
+// temas procedimentales (mate) nunca tienen recalls completos → quedaban SIEMPRE
+// atenuados (gris) aunque tuvieran muchos quick reviews. Contamos ambas fuentes,
+// que es lo que realmente alimenta SM-2 (ver lib/topic-kind.ts smScheduleSource).
+function scheduleSignalDimmed(t: TopicRow): boolean {
+  return t.total_recalls + t.total_quick_reviews < 2
+}
+
 function TrendIndicator({ trend }: { trend: "up" | "down" | "flat" | null }) {
   if (trend === null) return null
   if (trend === "up")   return <span className="text-xs text-green-600 dark:text-green-400">↑</span>
@@ -332,7 +341,7 @@ function MobileTopicCard({
         <span>Último: {formatDate(topic.last_recalled_at, tz)}</span>
         <span>{topic.total_recalls} recall{topic.total_recalls === 1 ? "" : "s"}</span>
         <span className="inline-flex items-center gap-1">
-          Próxima: <NextReviewCell daysOverdue={topic.days_overdue} dimmed={topic.total_recalls < 2} />
+          Próxima: <NextReviewCell daysOverdue={topic.days_overdue} dimmed={scheduleSignalDimmed(topic)} />
         </span>
       </div>
     </div>
@@ -741,7 +750,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
                       {topic.total_recalls}
                     </TableCell>
                     <TableCell className="text-right">
-                      <NextReviewCell daysOverdue={topic.days_overdue} dimmed={topic.total_recalls < 2} />
+                      <NextReviewCell daysOverdue={topic.days_overdue} dimmed={scheduleSignalDimmed(topic)} />
                     </TableCell>
                     <TableCell className="text-right">
                       <RowActions
