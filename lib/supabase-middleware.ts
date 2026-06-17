@@ -3,10 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { USER_HEADER } from "./auth-constants";
 
 // Rutas que NO requieren sesión de dashboard (el MCP/OAuth tienen su propia auth
-// por token; login/signup son las páginas de entrada).
+// por token; login/signup son las páginas de entrada; "/" es el landing público).
 const PUBLIC_PREFIXES = ["/login", "/signup", "/auth"];
 
+// El landing vive en "/" (exacto). El dashboard se movió a "/app".
 function isPublic(pathname: string) {
+  if (pathname === "/") return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
@@ -48,10 +50,10 @@ export async function updateSession(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(url);
   }
 
-  // Ya autenticado entrando a /login → mándalo al dashboard.
-  if (pathname === "/login" || pathname === "/signup") {
+  // Ya autenticado entrando al landing o a las páginas de entrada → al dashboard.
+  if (pathname === "/" || pathname === "/login" || pathname === "/signup") {
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/app";
     url.search = "";
     return NextResponse.redirect(url);
   }

@@ -48,7 +48,8 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 
 | Ruta | Qué hace |
 |---|---|
-| `/` | Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo y por **tipo** (teórico/práctico/teórico-práctico), ordena. Cada fila muestra un badge con el tipo derivado. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
+| `/` | **Landing público** (estático, sin auth): hero + cómo funciona + features + CTA a `/signup`. Usuarios con sesión que entran aquí se redirigen a `/app` (middleware). `app/page.tsx`. |
+| `/app` | **Dashboard** (requiere sesión). Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo y por **tipo** (teórico/práctico/teórico-práctico), ordena. Cada fila muestra un badge con el tipo derivado. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones y **reclasificar su kind** (chip teoría/práctica), borrar topic, y borrar/editar feedback de recalls del historial. Muestra un badge con el tipo derivado del topic (teórico/práctico/teórico-práctico). |
 | `/settings` | Ajustes por usuario: "repaso solo con temas estrenados", **cantidad de temas por sesión** (`review_slots`, 2–6, default 4; server-enforced en `get_review_plan`), **ajuste automático** (`review_slots_auto`: dimensiona la sesión a los temas vencidos hasta el tope `review_slots`) y **dificultad adaptativa en vivo** (`adaptive_difficulty` + `difficulty_pace` suave/normal/exigente, soft prefs que `get_review_plan` expone para que la IA las honre). Ver `docs/METODOLOGIA.md`. |
 | `/prompt` | Muestra las plantillas de system prompt (general/mate) para copiar a Claude Desktop. Estático (sin DB); contenido leído de los `.md` de la raíz. |
@@ -77,7 +78,8 @@ lib/db-mcp.ts                  — queries de escritura a Supabase (save_recall,
 lib/db.ts                      — queries de lectura a Supabase (dashboard)
 lib/topic-kind.ts              — módulo puro compartido: kind de subsección (teoria/practica), deriveTopicKind y smScheduleSource (selección de escalera SM-2)
 lib/supabase.ts                — cliente Supabase compartido
-app/page.tsx                   — página principal (Server Component)
+app/page.tsx                   — landing público (estático, sin auth)
+app/app/page.tsx               — dashboard (lista de topics; requiere sesión)
 app/topics/[id]/page.tsx       — detalle del topic (Server Component)
 components/dashboard-filters.tsx — lista + filtros + renombrar/fusionar/borrar + grupos por fila + selección múltiple (Client)
 components/group-editor.tsx     — GroupCombobox (sin datalist) + GroupChips reutilizables

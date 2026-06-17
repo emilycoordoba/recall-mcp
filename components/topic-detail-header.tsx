@@ -99,7 +99,7 @@ export function TopicDetailHeader({
       toast.error(data.error ?? "No se pudo borrar")
       return
     }
-    router.push("/")
+    router.push("/app")
     router.refresh()
   }
 
