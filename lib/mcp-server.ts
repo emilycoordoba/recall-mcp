@@ -123,7 +123,8 @@ export function createMcpServer(userId: number): McpServer {
     "Guarda el topic y sus subsecciones canónicas ANTES de pedir el recall al usuario. Clasifica cada subsección como 'teoria' (se entiende/explica, se evalúa con recall conceptual) o 'practica' (se resuelve con ejercicios). El tipo del TEMA se deriva: solo teoría → teórico, solo práctica → práctico, ambos → teórico-práctico. Usa default_kind para temas homogéneos (mate = todo 'practica') y kind por subsección para temas mixtos (programación, física).",
     {
       topic_name: z.string().describe("Nombre del topic"),
-      group_name: z.string().optional().describe("Grupo (ej: 'Python'). Opcional."),
+      group_name: z.string().optional().describe("Grupo PRIMARIO (ej: 'Python', 'matematica'). Opcional."),
+      additional_groups: z.array(z.string()).optional().describe("Grupos ADICIONALES además del primario (ej: la materia 'Álgebra'). El topic queda vinculado a todos."),
       default_kind: z.enum(["teoria", "practica"]).optional().describe("Tipo por defecto para subsecciones NUEVAS sin kind propio. No reclasifica las existentes."),
       subsections: z.array(z.union([
         z.string(),
@@ -133,11 +134,11 @@ export function createMcpServer(userId: number): McpServer {
         }),
       ])).describe("Subsecciones en orden. Cada una un string (hereda default_kind) o un objeto {name, kind}."),
     },
-    async ({ topic_name, group_name, default_kind, subsections }) => {
+    async ({ topic_name, group_name, additional_groups, default_kind, subsections }) => {
       try {
         // Normaliza la forma string|objeto a {name, kind?} para la capa de DB.
         const normalized = subsections.map((s) => (typeof s === "string" ? { name: s } : s));
-        const result = await saveTopicSubsections({ topic_name, group_name, default_kind, subsections: normalized }, userId);
+        const result = await saveTopicSubsections({ topic_name, group_name, additional_groups, default_kind, subsections: normalized }, userId);
         return { content: [{ type: "text", text: JSON.stringify({ success: true, message: `Topic "${topic_name}" listo para recall`, ...result }, null, 2) }] };
       } catch (err) {
         return { content: [{ type: "text", text: JSON.stringify({ success: false, error: String(err) }) }], isError: true };
