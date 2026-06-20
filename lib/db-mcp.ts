@@ -27,6 +27,9 @@ export interface SaveRecallInput {
 export interface SaveTopicSubsectionsInput {
   topic_name: string;
   group_name?: string;
+  // Grupos ADICIONALES además del primario (`group_name`). El topic queda vinculado
+  // a todos vía `topic_group_links` (muchos-a-muchos). Ver saveTopicSubsections.
+  additional_groups?: string[];
   // Tipo aplicado a las subsecciones NUEVAS de este guardado cuando no traen un
   // `kind` propio. No reclasifica subsecciones ya existentes (ver saveTopicSubsections).
   default_kind?: SubsectionKind;
@@ -219,6 +222,43 @@ async function getOrCreateGroup(name: string, userId: number): Promise<number> {
     .single();
   if (error) throw error;
   return data.id;
+}
+
+// Vincula una lista de grupos (get-or-create cada uno) al topic en `topic_group_links`,
+// incluido el primario, para que el dashboard los muestre/edite como chips. Dedupe
+// case-insensitive. Si el topic aún no tenía grupo primario, fija el primero (mismo
+// invariante que addTopicGroup). Idempotente. Devuelve los group_id en orden.
+async function linkTopicGroups(topicId: number, groupNames: string[], userId: number): Promise<number[]> {
+  const seen = new Map<string, string>();
+  for (const raw of groupNames) {
+    const name = raw.trim();
+    if (name) seen.set(name.toLowerCase(), name);
+  }
+  const names = [...seen.values()];
+  if (names.length === 0) return [];
+
+  const groupIds = await Promise.all(names.map((n) => getOrCreateGroup(n, userId)));
+
+  const { error } = await supabase
+    .from("topic_group_links")
+    .upsert(
+      groupIds.map((group_id) => ({ topic_id: topicId, group_id, user_id: userId })),
+      { onConflict: "topic_id,group_id", ignoreDuplicates: true },
+    );
+  if (error) throw error;
+
+  // Si el topic no tenía grupo primario, el primero de la lista pasa a serlo.
+  const { data: topic } = await supabase
+    .from("topics")
+    .select("group_id")
+    .eq("id", topicId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (topic && topic.group_id === null) {
+    await supabase.from("topics").update({ group_id: groupIds[0] }).eq("id", topicId).eq("user_id", userId);
+  }
+
+  return groupIds;
 }
 
 async function getOrCreateTopic(name: string, groupId: number | null, userId: number): Promise<number> {
@@ -611,8 +651,15 @@ export async function getReviewCandidates(userId: number, groupName?: string): P
 // ─── Write operations ─────────────────────────────────────────────────────────
 
 export async function saveTopicSubsections(input: SaveTopicSubsectionsInput, userId: number) {
-  const groupId = input.group_name ? await getOrCreateGroup(input.group_name, userId) : null;
-  const topicId = await getOrCreateTopic(input.topic_name, groupId, userId);
+  // group_name = primario; additional_groups = extras. linkTopicGroups crea las filas
+  // en topic_group_links para TODOS (incluido el primario) y fija el primario si falta.
+  const allGroupNames = [
+    ...(input.group_name ? [input.group_name] : []),
+    ...(input.additional_groups ?? []),
+  ];
+  const primaryId = allGroupNames[0] ? await getOrCreateGroup(allGroupNames[0], userId) : null;
+  const topicId = await getOrCreateTopic(input.topic_name, primaryId, userId);
+  if (allGroupNames.length) await linkTopicGroups(topicId, allGroupNames, userId);
 
   // Nombres que ya existían antes de este guardado — sirve para aplicar default_kind
   // SOLO a subsecciones nuevas (nunca reclasificar las que el usuario ya tenía).
