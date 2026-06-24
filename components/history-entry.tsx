@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
+import { useTranslations, useLocale } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { IconCheck, IconX, IconChevronDown, IconChevronUp, IconBolt } from "@tabler/icons-react"
 import type { HistoryEntry } from "@/lib/db"
 import { timeInTz } from "@/lib/dates"
+import { Link } from "@/i18n/navigation"
 
 function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) return null
@@ -17,6 +18,8 @@ function ScoreBadge({ score }: { score: number | null }) {
 }
 
 export function HistoryEntryRow({ entry, tz }: { entry: HistoryEntry; tz: string }) {
+  const t = useTranslations("history")
+  const locale = useLocale()
   const [open, setOpen] = useState(false)
   const isRecall = entry.type === "recall"
 
@@ -29,16 +32,16 @@ export function HistoryEntryRow({ entry, tz }: { entry: HistoryEntry; tz: string
       {/* Main row */}
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="w-12 text-right font-mono text-xs text-muted-foreground shrink-0">
-          {timeInTz(entry.date, tz)}
+          {timeInTz(entry.date, tz, locale === "en" ? "en-US" : "es-ES")}
         </span>
 
         <div className="w-24 shrink-0">
           {isRecall ? (
-            <Badge variant="outline" className="text-xs">Recall</Badge>
+            <Badge variant="outline" className="text-xs">{t("recall")}</Badge>
           ) : (
             <Badge variant="secondary" className="flex items-center gap-1 text-xs w-fit">
               <IconBolt className="h-3 w-3" />
-              Rápido
+              {t("quick")}
             </Badge>
           )}
         </div>
@@ -64,7 +67,7 @@ export function HistoryEntryRow({ entry, tz }: { entry: HistoryEntry; tz: string
         <button
           onClick={() => setOpen((v) => !v)}
           className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label={open ? "Ocultar detalles" : "Ver detalles"}
+          aria-label={open ? t("hideDetails") : t("showDetails")}
         >
           {open ? <IconChevronUp className="h-4 w-4" /> : <IconChevronDown className="h-4 w-4" />}
         </button>

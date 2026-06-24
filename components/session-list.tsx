@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations, useLocale } from "next-intl"
 import { SessionCard } from "@/components/session-card"
 import type { ReviewSessionEntry } from "@/lib/db"
 import { dayInTz, formatDayLabel } from "@/lib/dates"
@@ -12,6 +13,9 @@ import { dayInTz, formatDayLabel } from "@/lib/dates"
 const isEmpty = (s: ReviewSessionEntry) => s.slots.every((slot) => slot.score === null)
 
 export function SessionList({ sessions, tz }: { sessions: ReviewSessionEntry[]; tz: string }) {
+  const t = useTranslations("sessions")
+  const locale = useLocale()
+  const dateLocale = locale === "en" ? "en-US" : "es-ES"
   const [showEmpty, setShowEmpty] = useState(false)
 
   const emptyCount = sessions.filter(isEmpty).length
@@ -30,26 +34,27 @@ export function SessionList({ sessions, tz }: { sessions: ReviewSessionEntry[]; 
       {emptyCount > 0 && (
         <div className="mb-4 flex items-center gap-2 text-xs text-muted-foreground">
           <span>
-            {emptyCount} {emptyCount === 1 ? "sesión vacía" : "sesiones vacías"}
-            {showEmpty ? " (mostradas)" : " ocultas"}
+            {showEmpty
+              ? t("emptyShownCount", { count: emptyCount })
+              : t("emptyHiddenCount", { count: emptyCount })}
           </span>
           <button
             onClick={() => setShowEmpty((v) => !v)}
             className="underline underline-offset-4 hover:text-foreground"
           >
-            {showEmpty ? "Ocultar" : "Mostrar"}
+            {showEmpty ? t("hide") : t("show")}
           </button>
         </div>
       )}
 
       {visible.length === 0 ? (
-        <p className="text-center text-muted-foreground py-20">No hay sesiones para mostrar.</p>
+        <p className="text-center text-muted-foreground py-20">{t("emptyVisible")}</p>
       ) : (
         <div className="space-y-8">
           {Array.from(byDay.entries()).map(([day, daySessions]) => (
             <div key={day}>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground capitalize">
-                {formatDayLabel(day)}
+                {formatDayLabel(day, dateLocale)}
               </h2>
               <div className="space-y-3">
                 {daySessions.map((session) => (

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl"
 import { AppHeader } from "@/components/app-header"
 import { BackButton } from "@/components/back-button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -5,8 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 // Skeleton de /history: título + grupos por día, cada uno un contenedor con
 // filas divididas tipo HistoryEntryRow.
 export default function Loading() {
+  const t = useTranslations("common")
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10" aria-busy="true" aria-label="Cargando">
+    <div className="mx-auto max-w-3xl px-6 py-10" aria-busy="true" aria-label={t("loading")}>
       <AppHeader />
       <BackButton />
       <div className="mb-8">

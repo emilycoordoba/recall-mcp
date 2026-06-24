@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl"
 import { AppHeader } from "@/components/app-header"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -5,8 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 // así que la navegación queda presente mientras carga el contenido. El cuerpo
 // imita la estructura: conteo, tarjetas de grupo, barra de filtros y la lista.
 export default function Loading() {
+  const t = useTranslations("common")
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10" aria-busy="true" aria-label="Cargando">
+    <div className="mx-auto max-w-5xl px-6 py-10" aria-busy="true" aria-label={t("loading")}>
       <AppHeader />
       <Skeleton className="-mt-4 mb-8 h-4 w-40" />
 

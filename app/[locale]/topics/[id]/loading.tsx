@@ -1,11 +1,13 @@
+import { useTranslations } from "next-intl"
 import { BackButton } from "@/components/back-button"
 import { Skeleton } from "@/components/ui/skeleton"
 
 // Skeleton del detalle de tema: header (título, grupos, descripción, stats),
 // card de subsecciones e historial de sesiones.
 export default function Loading() {
+  const t = useTranslations("common")
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10" aria-busy="true" aria-label="Cargando">
+    <div className="mx-auto max-w-4xl px-6 py-10" aria-busy="true" aria-label={t("loading")}>
       <BackButton />
 
       {/* Header del tema */}

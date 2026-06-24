@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import type { UserSettings } from "@/lib/db-mcp"
 import {
@@ -65,6 +66,7 @@ function Row({
 }
 
 export function SettingsForm({ initial }: { initial: UserSettings }) {
+  const t = useTranslations("settings")
   const [settings, setSettings] = useState(initial)
   const [saving, setSaving] = useState(false)
 
@@ -81,17 +83,17 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
     if (!res.ok) {
       setSettings(prev) // rollback
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo guardar")
+      toast.error(data.error ?? t("saveError"))
     } else {
-      toast.success("Ajustes guardados")
+      toast.success(t("saveSuccess"))
     }
   }
 
   return (
     <div className="divide-y rounded-lg border bg-card">
       <Row
-        title="Repasar solo temas ya estrenados"
-        description="Cuando está activo, los temas que nunca repasaste no entran a la sesión de repaso espaciado: se listan aparte como temas pendientes por estrenar."
+        title={t("onlyPracticedTitle")}
+        description={t("onlyPracticedDesc")}
         control={
           <Toggle
             checked={settings.review_only_practiced}
@@ -102,12 +104,8 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
       />
 
       <Row
-        title={settings.review_slots_auto ? "Máximo de temas por sesión" : "Temas por sesión de repaso"}
-        description={
-          settings.review_slots_auto
-            ? "Con el ajuste automático activo, la sesión nunca pasa de este tope (en días tranquilos trae menos)."
-            : "Cuántos temas trae cada sesión. Menos = sesiones más cortas (se recortan primero el recall completo y la consolidación); más = sesiones más largas."
-        }
+        title={settings.review_slots_auto ? t("slotsTitleAuto") : t("slotsTitle")}
+        description={settings.review_slots_auto ? t("slotsDescAuto") : t("slotsDesc")}
         control={
           <Select
             value={String(settings.review_slots)}
@@ -129,8 +127,8 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
       />
 
       <Row
-        title="Ajustar la cantidad automáticamente"
-        description="Cuando está activo, el tamaño de cada sesión se ajusta a cuántos temas tienes vencidos ese día (sin pasar del máximo de arriba). Días tranquilos = sesiones más cortas; y se acorta solo a medida que dominas los temas."
+        title={t("autoTitle")}
+        description={t("autoDesc")}
         control={
           <Toggle
             checked={settings.review_slots_auto}
@@ -141,8 +139,8 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
       />
 
       <Row
-        title="Dificultad adaptativa en vivo"
-        description="Cuando está activo, el tutor sube o baja el nivel de los ejercicios dentro de la misma sesión según cómo vayas respondiendo, en vez de mantener un solo nivel. Pensado sobre todo para práctica de procedimientos (mate)."
+        title={t("adaptiveTitle")}
+        description={t("adaptiveDesc")}
         control={
           <Toggle
             checked={settings.adaptive_difficulty}
@@ -153,8 +151,8 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
       />
 
       <Row
-        title="Ritmo de la dificultad"
-        description="Qué tan rápido escala la dificultad adaptativa. Suave sube despacio y baja ante cualquier tropiezo; exigente sube rápido y tolera más antes de bajar. Solo aplica con la dificultad adaptativa activa."
+        title={t("paceTitle")}
+        description={t("paceDesc")}
         control={
           <Select
             value={settings.difficulty_pace}
@@ -165,9 +163,9 @@ export function SettingsForm({ initial }: { initial: UserSettings }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="suave">Suave</SelectItem>
-              <SelectItem value="normal">Normal</SelectItem>
-              <SelectItem value="exigente">Exigente</SelectItem>
+              <SelectItem value="suave">{t("paceSuave")}</SelectItem>
+              <SelectItem value="normal">{t("paceNormal")}</SelectItem>
+              <SelectItem value="exigente">{t("paceExigente")}</SelectItem>
             </SelectContent>
           </Select>
         }

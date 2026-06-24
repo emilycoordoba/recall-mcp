@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { IconCopy } from "@tabler/icons-react"
 
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils"
 // leídas desde el Server Component (lib/prompts.ts); este island solo maneja la
 // selección y el copy.
 export function PromptViewer({ templates }: { templates: LoadedPromptTemplate[] }) {
+  const t = useTranslations("prompt")
   const [selectedId, setSelectedId] = React.useState(templates[0]?.id)
   const selected = templates.find((t) => t.id === selectedId) ?? templates[0]
 
@@ -20,19 +22,19 @@ export function PromptViewer({ templates }: { templates: LoadedPromptTemplate[] 
   // o falla, avisamos para copiar a mano en vez de romper en silencio.
   async function handleCopy() {
     if (!navigator.clipboard?.writeText) {
-      toast.error("Tu navegador no permite copiar acá. Seleccioná el texto y copialo a mano (Ctrl+C).")
+      toast.error(t("clipboardBlocked"))
       return
     }
     try {
       await navigator.clipboard.writeText(selected.content)
-      toast.success(`Plantilla "${selected.label}" copiada`)
+      toast.success(t("copied", { label: selected.label }))
     } catch {
-      toast.error("No se pudo copiar. Seleccioná el texto y copialo a mano (Ctrl+C).")
+      toast.error(t("copyError"))
     }
   }
 
   if (!selected) {
-    return <p className="text-sm text-muted-foreground">No hay plantillas configuradas.</p>
+    return <p className="text-sm text-muted-foreground">{t("noTemplates")}</p>
   }
 
   return (
@@ -70,7 +72,7 @@ export function PromptViewer({ templates }: { templates: LoadedPromptTemplate[] 
           className="absolute right-3 top-3"
         >
           <IconCopy />
-          Copiar
+          {t("copy")}
         </Button>
         <pre className="max-h-[28rem] overflow-auto rounded-lg border border-border bg-muted/40 p-4 pt-12 text-xs leading-relaxed whitespace-pre-wrap">
           {selected.content}
