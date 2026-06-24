@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { getTranslations } from "next-intl/server"
 import { getTopic, getSubsectionStats, getRecalls, getRecallSubsections, getQuickReviews, getQuickReviewAnswers, getGroups, getUserTimezone } from "@/lib/db"
 import { suggestDifficulty } from "@/lib/difficulty"
 import { currentUserId } from "@/lib/auth"
@@ -13,21 +14,23 @@ export const revalidate = 30
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ locale: string; id: string }>
 }) {
-  const { id } = await params
+  const { locale, id } = await params
+  const t = await getTranslations({ locale, namespace: "topicDetail" })
   const topicId = parseInt(id, 10)
-  if (isNaN(topicId)) return { title: "Tema" }
+  if (isNaN(topicId)) return { title: t("fallbackTitle") }
   const topic = await getTopic(topicId, await currentUserId())
-  return { title: topic?.name ?? "Tema" }
+  return { title: topic?.name ?? t("fallbackTitle") }
 }
 
 export default async function TopicPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ locale: string; id: string }>
 }) {
   const { id } = await params
+  const t = await getTranslations("topicDetail")
   const topicId = parseInt(id, 10)
   if (isNaN(topicId)) notFound()
 
@@ -85,7 +88,7 @@ export default async function TopicPage({
       {subsections.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Subsecciones</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("subsectionsTitle")}</CardTitle>
           </CardHeader>
           <CardContent>
             <SubsectionList subsections={subsections} />

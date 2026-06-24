@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations, useLocale } from "next-intl"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,10 +26,10 @@ import { IconCheck, IconX, IconBolt, IconTrash } from "@tabler/icons-react"
 import { DifficultyBadge } from "@/components/difficulty-badge"
 import { useConfirm } from "@/components/confirm-dialog"
 
-function formatDate(iso: string, tz: string) {
+function formatDate(iso: string, tz: string, locale: string) {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("es-ES", {
+  return d.toLocaleDateString(locale === "en" ? "en-US" : "es-ES", {
     timeZone: tz,
     day: "2-digit",
     month: "short",
@@ -101,6 +102,7 @@ function RecallFeedback({
   onSaved: (feedback: string | null) => void
 }) {
   const router = useRouter()
+  const t = useTranslations("topicSessions")
   const [value, setValue] = useState(initial ?? "")
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -119,7 +121,7 @@ function RecallFeedback({
     if (!res.ok) {
       setValue(initial ?? "")
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo guardar el feedback")
+      toast.error(data.error ?? t("feedbackSaveError"))
     } else {
       onSaved(trimmed || null)
       router.refresh()
@@ -129,13 +131,13 @@ function RecallFeedback({
   if (editing) {
     return (
       <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Feedback</p>
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("feedbackLabel")}</p>
         <textarea
           value={value}
           disabled={busy}
           autoFocus
           rows={3}
-          placeholder="Feedback de este recall…"
+          placeholder={t("feedbackPlaceholder")}
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -153,7 +155,7 @@ function RecallFeedback({
         onClick={() => setEditing(true)}
         className="text-xs text-muted-foreground underline-offset-4 hover:underline"
       >
-        + Agregar feedback
+        {t("addFeedback")}
       </button>
     )
   }
@@ -161,10 +163,10 @@ function RecallFeedback({
   return (
     <div className="group">
       <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Feedback
+        {t("feedbackLabel")}
         <button
           onClick={() => setEditing(true)}
-          title="Editar feedback"
+          title={t("editFeedback")}
           className="text-xs leading-none opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
         >
           ✎
@@ -187,6 +189,7 @@ function EditableDifficulty({
   initial: number | null
 }) {
   const router = useRouter()
+  const t = useTranslations("topicSessions")
   const [level, setLevel] = useState<number | null>(initial)
   const [busy, setBusy] = useState(false)
 
@@ -204,9 +207,9 @@ function EditableDifficulty({
     if (!res.ok) {
       setLevel(prev) // rollback
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo guardar la dificultad")
+      toast.error(data.error ?? t("difficultySaveError"))
     } else {
-      toast.success(next === null ? "Dificultad quitada" : `Dificultad ${next}/5`)
+      toast.success(next === null ? t("difficultyRemoved") : t("difficultySet", { level: next }))
       router.refresh()
     }
   }
@@ -218,25 +221,25 @@ function EditableDifficulty({
       disabled={busy}
     >
       <SelectTrigger
-        title="Editar dificultad"
+        title={t("editDifficulty")}
         className="h-auto w-fit gap-1 border-0 bg-transparent p-0 shadow-none hover:bg-transparent focus-visible:ring-0 disabled:opacity-50"
       >
         {level === null ? (
           <span className="text-xs text-muted-foreground underline-offset-4 hover:underline">
-            + dificultad
+            {t("addDifficulty")}
           </span>
         ) : (
-          <DifficultyBadge level={level} title={`Ejercicios planteados a dificultad ${level}/5 · editar`} />
+          <DifficultyBadge level={level} title={t("difficultyBadgeTitle", { level })} />
         )}
       </SelectTrigger>
       {/* position="popper": el trigger es un badge borderless de altura casi nula;
           el modo item-aligned (default) calcula mal su posición y abre el panel
           fuera de vista. popper lo ancla debajo del trigger como un dropdown normal. */}
       <SelectContent position="popper" align="start" className="min-w-28">
-        <SelectItem value="none" className="text-xs">Sin dificultad</SelectItem>
+        <SelectItem value="none" className="text-xs">{t("noDifficulty")}</SelectItem>
         {[1, 2, 3, 4, 5].map((n) => (
           <SelectItem key={n} value={String(n)} className="text-xs">
-            Dif. {n}/5
+            {t("diffShort", { level: n })}
           </SelectItem>
         ))}
       </SelectContent>
@@ -253,14 +256,16 @@ interface Props {
 export function TopicSessions({ sessions, subsections, tz }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
+  const t = useTranslations("topicSessions")
+  const locale = useLocale()
   const [filter, setFilter] = useState<string>("all")
   const [localSessions, setLocalSessions] = useState(sessions)
 
   async function handleDeleteRecall(id: number) {
     const ok = await confirm({
-      title: "¿Borrar este recall?",
-      description: "Esta acción no se puede deshacer.",
-      confirmText: "Borrar recall",
+      title: t("deleteRecallTitle"),
+      description: t("deleteRecallDesc"),
+      confirmText: t("deleteRecallConfirm"),
       destructive: true,
     })
     if (!ok) return
@@ -270,9 +275,9 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
     if (!res.ok) {
       setLocalSessions(prev) // rollback
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo borrar el recall")
+      toast.error(data.error ?? t("deleteRecallError"))
     } else {
-      toast.success("Recall borrado")
+      toast.success(t("recallDeleted"))
       router.refresh()
     }
   }
@@ -293,14 +298,14 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-4">
-        <h2 className="text-base font-medium">Historial de sesiones</h2>
+        <h2 className="text-base font-medium">{t("historyTitle")}</h2>
         {subsections.length > 0 && (
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger className="h-7 w-48 px-2 py-1.5 text-xs">
-              <SelectValue placeholder="Todas las subsecciones" />
+              <SelectValue placeholder={t("allSubsections")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs">Todas las subsecciones</SelectItem>
+              <SelectItem value="all" className="text-xs">{t("allSubsections")}</SelectItem>
               {subsections.map((s) => (
                 <SelectItem key={s.id} value={s.name} className="text-xs">
                   {s.name}
@@ -313,7 +318,7 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
 
       {filtered.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {filter === "all" ? "Aún no hay sesiones." : `No hay sesiones que cubran "${filter}".`}
+          {filter === "all" ? t("empty") : t("emptyFiltered", { name: filter })}
         </p>
       ) : (
         <div className="space-y-6">
@@ -323,15 +328,15 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz)}</span>
-                      <Badge variant="outline" className="text-xs">Recall completo</Badge>
+                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz, locale)}</span>
+                      <Badge variant="outline" className="text-xs">{t("fullRecall")}</Badge>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <ScoreBadge score={session.data.overall_score} />
                       <Button
                         variant="ghost"
                         size="icon-xs"
-                        title="Borrar recall"
+                        title={t("deleteRecallButton")}
                         onClick={() => handleDeleteRecall(session.data.id)}
                         className="text-muted-foreground hover:text-destructive"
                       >
@@ -346,9 +351,9 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Subsección</TableHead>
-                            <TableHead className="text-center w-20">Cubierta</TableHead>
-                            <TableHead className="text-right w-20">Puntaje</TableHead>
+                            <TableHead>{t("colSubsection")}</TableHead>
+                            <TableHead className="text-center w-20">{t("colCovered")}</TableHead>
+                            <TableHead className="text-right w-20">{t("colScore")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -375,7 +380,7 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                   )}
                   {session.data.transcript && (
                     <div>
-                      <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Transcripción</p>
+                      <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("transcript")}</p>
                       <p className="whitespace-pre-wrap rounded-md bg-muted/50 px-4 py-3 text-sm leading-relaxed">
                         {session.data.transcript}
                       </p>
@@ -393,10 +398,10 @@ export function TopicSessions({ sessions, subsections, tz }: Props) {
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz)}</span>
+                      <span className="text-xs text-muted-foreground">{formatDate(session.date, tz, locale)}</span>
                       <Badge variant="secondary" className="flex items-center gap-1 text-xs">
                         <IconBolt className="h-3 w-3" />
-                        Repaso rápido
+                        {t("quickReview")}
                       </Badge>
                       <EditableDifficulty
                         quickReviewId={session.data.id}

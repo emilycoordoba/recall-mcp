@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { IconTrash } from "@tabler/icons-react"
@@ -36,6 +37,7 @@ export function TopicDetailHeader({
 }) {
   const router = useRouter()
   const confirm = useConfirm()
+  const t = useTranslations("topicDetail")
   const [name, setName] = useState(topic.name)
   const [description, setDescription] = useState(topic.description ?? "")
   const [editingName, setEditingName] = useState(false)
@@ -57,7 +59,7 @@ export function TopicDetailHeader({
     if (!res.ok) {
       onError()
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo guardar")
+      toast.error(data.error ?? t("toastSaveError"))
     } else {
       router.refresh()
     }
@@ -85,9 +87,9 @@ export function TopicDetailHeader({
 
   async function remove() {
     const ok = await confirm({
-      title: `¿Borrar el tema "${topic.name}"?`,
-      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
-      confirmText: "Borrar tema",
+      title: t("deleteTitle", { name: topic.name }),
+      description: t("deleteDesc"),
+      confirmText: t("deleteConfirm"),
       destructive: true,
     })
     if (!ok) return
@@ -96,7 +98,7 @@ export function TopicDetailHeader({
     if (!res.ok) {
       setBusy(false)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo borrar")
+      toast.error(data.error ?? t("toastDeleteError"))
       return
     }
     router.push("/app")
@@ -125,7 +127,7 @@ export function TopicDetailHeader({
             <h1
               className="group cursor-text text-2xl font-semibold tracking-tight"
               onClick={() => setEditingName(true)}
-              title="Click para editar"
+              title={t("clickToEdit")}
             >
               {name}
               <span className="ml-2 align-middle text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60">
@@ -141,10 +143,10 @@ export function TopicDetailHeader({
           size="sm"
           disabled={busy}
           onClick={remove}
-          title="Borrar tema"
+          title={t("deleteButtonTitle")}
         >
           <IconTrash className="size-3.5" />
-          Borrar
+          {t("deleteButton")}
         </Button>
       </div>
 
@@ -158,7 +160,7 @@ export function TopicDetailHeader({
           disabled={busy}
           autoFocus
           rows={2}
-          placeholder="Descripción del tema…"
+          placeholder={t("descPlaceholder")}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitDesc}
           onKeyDown={(e) => {
@@ -180,13 +182,13 @@ export function TopicDetailHeader({
           onClick={() => setEditingDesc(true)}
           className="mt-2 text-xs text-muted-foreground underline-offset-4 hover:underline"
         >
-          + Agregar descripción
+          {t("addDescription")}
         </button>
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <p className="text-xs text-muted-foreground">
-          {recallCount} recall{recallCount !== 1 ? "s" : ""} · {quickReviewCount} repaso{quickReviewCount !== 1 ? "s" : ""} rápido{quickReviewCount !== 1 ? "s" : ""}
+          {t("counts", { recalls: recallCount, reviews: quickReviewCount })}
         </p>
         {difficulty && (
           <span className="inline-flex items-center gap-1.5">
@@ -194,13 +196,13 @@ export function TopicDetailHeader({
               level={difficulty.last ?? difficulty.suggested}
               title={
                 difficulty.last === null
-                  ? `Dificultad sugerida ${difficulty.suggested}/5 (aún sin registrar)`
-                  : `Dificultad actual ${difficulty.last}/5`
+                  ? t("diffSuggested", { level: difficulty.suggested })
+                  : t("diffCurrent", { level: difficulty.last })
               }
             />
             {difficulty.last !== null && difficulty.suggested !== difficulty.last && (
               <span className="text-xs text-muted-foreground">
-                próxima sugerida: {difficulty.suggested}/5
+                {t("nextSuggested", { level: difficulty.suggested })}
               </span>
             )}
           </span>

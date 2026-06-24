@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useCallback, useContext, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import { AlertDialog } from "radix-ui"
 import { Button } from "@/components/ui/button"
 
@@ -21,6 +22,7 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
 const ConfirmContext = createContext<ConfirmFn | null>(null)
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("common")
   const [open, setOpen] = useState(false)
   const [options, setOptions] = useState<ConfirmOptions | null>(null)
   // Guardamos el resolve de la promesa pendiente para llamarlo al cerrar.
@@ -58,7 +60,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <div className="mt-5 flex justify-end gap-2">
               <AlertDialog.Cancel asChild>
                 <Button variant="outline" size="sm" onClick={() => close(false)}>
-                  {options?.cancelText ?? "Cancelar"}
+                  {options?.cancelText ?? t("cancel")}
                 </Button>
               </AlertDialog.Cancel>
               <AlertDialog.Action asChild>
@@ -67,7 +69,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   size="sm"
                   onClick={() => close(true)}
                 >
-                  {options?.confirmText ?? "Confirmar"}
+                  {options?.confirmText ?? t("confirm")}
                 </Button>
               </AlertDialog.Action>
             </div>

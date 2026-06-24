@@ -10,7 +10,8 @@
     "delete": "Delete",
     "edit": "Edit",
     "retry": "Retry",
-    "back": "Back"
+    "back": "Back",
+    "confirm": "Confirm"
   },
   "nav": {
     "home": "Go to home",
@@ -106,7 +107,20 @@
     "deleteButtonTitle": "Delete group \"{name}\"",
     "deleteError": "Could not delete the group",
     "topicsCount": "{count, plural, one {# topic} other {# topics}}",
-    "below3": "{count} below 3.0"
+    "below3": "{count} below 3.0",
+    "addError": "Could not add the group",
+    "removeError": "Could not remove the group"
+  },
+  "subsections": {
+    "changeKindError": "Could not change the type",
+    "renameError": "Could not rename",
+    "renameTitle": "Rename subsection",
+    "kindPractica": "practice",
+    "kindTeoria": "theory",
+    "toggleTitlePractica": "Practice — click to change",
+    "toggleTitleTeoria": "Theory — click to change",
+    "mastered": "Mastered",
+    "inProgress": "In progress"
   },
   "filters": {
     "searchPlaceholder": "Search topic…",
@@ -174,5 +188,54 @@
     "toastRemoveGroupError": "Could not remove the group",
     "bulkDeletePartial": "Could not delete {failed} of {total} topics.",
     "bulkDeleted": "{count, plural, one {# topic deleted} other {# topics deleted}}"
+  },
+  "topicSessions": {
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholder": "Feedback for this recall…",
+    "addFeedback": "+ Add feedback",
+    "editFeedback": "Edit feedback",
+    "feedbackSaveError": "Could not save the feedback",
+    "difficultySaveError": "Could not save the difficulty",
+    "difficultyRemoved": "Difficulty removed",
+    "difficultySet": "Difficulty {level}/5",
+    "editDifficulty": "Edit difficulty",
+    "addDifficulty": "+ difficulty",
+    "difficultyBadgeTitle": "Exercises set at difficulty {level}/5 · edit",
+    "noDifficulty": "No difficulty",
+    "diffShort": "Diff. {level}/5",
+    "deleteRecallTitle": "Delete this recall?",
+    "deleteRecallDesc": "This action cannot be undone.",
+    "deleteRecallConfirm": "Delete recall",
+    "deleteRecallError": "Could not delete the recall",
+    "recallDeleted": "Recall deleted",
+    "deleteRecallButton": "Delete recall",
+    "historyTitle": "Session history",
+    "allSubsections": "All subsections",
+    "empty": "No sessions yet.",
+    "emptyFiltered": "No sessions covering \"{name}\".",
+    "fullRecall": "Full recall",
+    "colSubsection": "Subsection",
+    "colCovered": "Covered",
+    "colScore": "Score",
+    "transcript": "Transcript",
+    "quickReview": "Quick review"
+  },
+  "topicDetail": {
+    "fallbackTitle": "Topic",
+    "subsectionsTitle": "Subsections",
+    "clickToEdit": "Click to edit",
+    "deleteTitle": "Delete the topic \"{name}\"?",
+    "deleteDesc": "Its entire history is deleted too. This action cannot be undone.",
+    "deleteConfirm": "Delete topic",
+    "deleteButton": "Delete",
+    "deleteButtonTitle": "Delete topic",
+    "descPlaceholder": "Topic description…",
+    "addDescription": "+ Add description",
+    "toastSaveError": "Could not save",
+    "toastDeleteError": "Could not delete",
+    "counts": "{recalls, plural, one {# recall} other {# recalls}} · {reviews, plural, one {# quick review} other {# quick reviews}}",
+    "diffSuggested": "Suggested difficulty {level}/5 (not recorded yet)",
+    "diffCurrent": "Current difficulty {level}/5",
+    "nextSuggested": "next suggested: {level}/5"
   }
 }

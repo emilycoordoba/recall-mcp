@@ -10,7 +10,8 @@
     "delete": "Borrar",
     "edit": "Editar",
     "retry": "Reintentar",
-    "back": "Volver"
+    "back": "Volver",
+    "confirm": "Confirmar"
   },
   "nav": {
     "home": "Ir al inicio",
@@ -106,7 +107,20 @@
     "deleteButtonTitle": "Borrar grupo \"{name}\"",
     "deleteError": "No se pudo borrar el grupo",
     "topicsCount": "{count, plural, one {# tema} other {# temas}}",
-    "below3": "{count} bajo 3.0"
+    "below3": "{count} bajo 3.0",
+    "addError": "No se pudo agregar el grupo",
+    "removeError": "No se pudo quitar el grupo"
+  },
+  "subsections": {
+    "changeKindError": "No se pudo cambiar el tipo",
+    "renameError": "No se pudo renombrar",
+    "renameTitle": "Renombrar subsección",
+    "kindPractica": "práctica",
+    "kindTeoria": "teoría",
+    "toggleTitlePractica": "Práctica — clic para cambiar",
+    "toggleTitleTeoria": "Teoría — clic para cambiar",
+    "mastered": "Dominada",
+    "inProgress": "En progreso"
   },
   "filters": {
     "searchPlaceholder": "Buscar tema…",
@@ -174,5 +188,54 @@
     "toastRemoveGroupError": "No se pudo quitar el grupo",
     "bulkDeletePartial": "No se pudieron borrar {failed} de {total} temas.",
     "bulkDeleted": "{count, plural, one {# tema borrado} other {# temas borrados}}"
+  },
+  "topicSessions": {
+    "feedbackLabel": "Feedback",
+    "feedbackPlaceholder": "Feedback de este recall…",
+    "addFeedback": "+ Agregar feedback",
+    "editFeedback": "Editar feedback",
+    "feedbackSaveError": "No se pudo guardar el feedback",
+    "difficultySaveError": "No se pudo guardar la dificultad",
+    "difficultyRemoved": "Dificultad quitada",
+    "difficultySet": "Dificultad {level}/5",
+    "editDifficulty": "Editar dificultad",
+    "addDifficulty": "+ dificultad",
+    "difficultyBadgeTitle": "Ejercicios planteados a dificultad {level}/5 · editar",
+    "noDifficulty": "Sin dificultad",
+    "diffShort": "Dif. {level}/5",
+    "deleteRecallTitle": "¿Borrar este recall?",
+    "deleteRecallDesc": "Esta acción no se puede deshacer.",
+    "deleteRecallConfirm": "Borrar recall",
+    "deleteRecallError": "No se pudo borrar el recall",
+    "recallDeleted": "Recall borrado",
+    "deleteRecallButton": "Borrar recall",
+    "historyTitle": "Historial de sesiones",
+    "allSubsections": "Todas las subsecciones",
+    "empty": "Aún no hay sesiones.",
+    "emptyFiltered": "No hay sesiones que cubran \"{name}\".",
+    "fullRecall": "Recall completo",
+    "colSubsection": "Subsección",
+    "colCovered": "Cubierta",
+    "colScore": "Puntaje",
+    "transcript": "Transcripción",
+    "quickReview": "Repaso rápido"
+  },
+  "topicDetail": {
+    "fallbackTitle": "Tema",
+    "subsectionsTitle": "Subsecciones",
+    "clickToEdit": "Click para editar",
+    "deleteTitle": "¿Borrar el tema \"{name}\"?",
+    "deleteDesc": "Se borra también todo su historial. Esta acción no se puede deshacer.",
+    "deleteConfirm": "Borrar tema",
+    "deleteButton": "Borrar",
+    "deleteButtonTitle": "Borrar tema",
+    "descPlaceholder": "Descripción del tema…",
+    "addDescription": "+ Agregar descripción",
+    "toastSaveError": "No se pudo guardar",
+    "toastDeleteError": "No se pudo borrar",
+    "counts": "{recalls, plural, one {# recall} other {# recalls}} · {reviews, plural, one {# repaso rápido} other {# repasos rápidos}}",
+    "diffSuggested": "Dificultad sugerida {level}/5 (aún sin registrar)",
+    "diffCurrent": "Dificultad actual {level}/5",
+    "nextSuggested": "próxima sugerida: {level}/5"
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { GroupChips, type GroupRef } from "@/components/group-editor"
 
@@ -19,6 +20,7 @@ export function TopicGroups({
   allGroups: GroupRef[]
 }) {
   const router = useRouter()
+  const t = useTranslations("groups")
   const [groups, setGroups] = useState<GroupRef[]>(initialGroups)
   const [busy, setBusy] = useState(false)
 
@@ -33,7 +35,7 @@ export function TopicGroups({
     setBusy(false)
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo agregar el grupo")
+      toast.error(data.error ?? t("addError"))
       return
     }
     const { group } = (await res.json()) as { group: GroupRef }
@@ -50,7 +52,7 @@ export function TopicGroups({
     if (!res.ok) {
       setGroups(prev)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo quitar el grupo")
+      toast.error(data.error ?? t("removeError"))
       return
     }
     router.refresh()

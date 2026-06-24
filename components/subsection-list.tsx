@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 
 type SubsectionKind = "teoria" | "practica"
@@ -16,6 +17,7 @@ interface Subsection {
 
 function KindChip({ sub }: { sub: Subsection }) {
   const router = useRouter()
+  const t = useTranslations("subsections")
   const [kind, setKind] = useState<SubsectionKind>(sub.kind)
   const [busy, setBusy] = useState(false)
 
@@ -32,7 +34,7 @@ function KindChip({ sub }: { sub: Subsection }) {
     if (!res.ok) {
       setKind(kind) // revertir
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo cambiar el tipo")
+      toast.error(data.error ?? t("changeKindError"))
     } else {
       router.refresh()
     }
@@ -43,20 +45,21 @@ function KindChip({ sub }: { sub: Subsection }) {
     <button
       onClick={toggle}
       disabled={busy}
-      title={`${isPractica ? "Práctica" : "Teoría"} — clic para cambiar`}
+      title={isPractica ? t("toggleTitlePractica") : t("toggleTitleTeoria")}
       className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none transition-colors disabled:opacity-50 ${
         isPractica
           ? "bg-violet-500/15 text-violet-600 dark:text-violet-300"
           : "bg-sky-500/15 text-sky-600 dark:text-sky-300"
       }`}
     >
-      {isPractica ? "práctica" : "teoría"}
+      {isPractica ? t("kindPractica") : t("kindTeoria")}
     </button>
   )
 }
 
 function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
   const router = useRouter()
+  const t = useTranslations("subsections")
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(sub.name)
   const [busy, setBusy] = useState(false)
@@ -75,7 +78,7 @@ function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
     if (!res.ok) {
       setValue(sub.name)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo renombrar")
+      toast.error(data.error ?? t("renameError"))
     } else {
       router.refresh()
     }
@@ -102,7 +105,7 @@ function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
           <span>{value}</span>
           <button
             onClick={() => setEditing(true)}
-            title="Renombrar subsección"
+            title={t("renameTitle")}
             className="text-xs leading-none text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
           >
             ✎
@@ -111,9 +114,9 @@ function SubsectionRow({ sub, index }: { sub: Subsection; index: number }) {
       )}
       <KindChip sub={sub} />
       {sub.mastered ? (
-        <span className="text-xs text-green-600 dark:text-green-400" title="Dominada">✓</span>
+        <span className="text-xs text-green-600 dark:text-green-400" title={t("mastered")}>✓</span>
       ) : sub.practice_count > 0 ? (
-        <span className="text-xs text-amber-500" title="En progreso">○</span>
+        <span className="text-xs text-amber-500" title={t("inProgress")}>○</span>
       ) : null}
       {sub.practice_count > 0 && (
         <span className="font-mono text-xs text-muted-foreground">×{sub.practice_count}</span>
