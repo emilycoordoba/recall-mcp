@@ -1,7 +1,8 @@
-import Link from "next/link"
+import { getTranslations, setRequestLocale } from "next-intl/server"
 import { Logo, LogoMark } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Link } from "@/i18n/navigation"
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site"
 
 export const metadata = {
@@ -11,57 +12,41 @@ export const metadata = {
   openGraph: { url: "/", title: `${SITE_NAME} — ${SITE_TAGLINE}`, description: SITE_DESCRIPTION },
 }
 
-// Datos estructurados para resultados enriquecidos: Recall como app web educativa.
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: SITE_NAME,
-  url: SITE_URL,
-  description: SITE_DESCRIPTION,
-  applicationCategory: "EducationalApplication",
-  operatingSystem: "Web",
-  inLanguage: "es",
-  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-}
+export default async function LandingPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params
+  setRequestLocale(locale)
+  const t = await getTranslations("landing")
 
-const STEPS = [
-  {
-    n: "1",
-    title: "Claude te explica",
-    body: "En Claude Desktop, Claude explica un tema y guarda su tabla de contenido como verdad de referencia — antes de que digas una palabra.",
-  },
-  {
-    n: "2",
-    title: "Hacés recall libre",
-    body: "Te pregunta «¿qué recordás?» y respondés sin pistas. El recuerdo activo es lo que fija lo aprendido en la memoria a largo plazo.",
-  },
-  {
-    n: "3",
-    title: "Seguís tu progreso",
-    body: "Claude evalúa y puntúa cada subsección; el dashboard te muestra qué dominás y qué repasar, con repetición espaciada.",
-  },
-]
+  // Datos estructurados para resultados enriquecidos: Recall como app web educativa.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    applicationCategory: "EducationalApplication",
+    operatingSystem: "Web",
+    inLanguage: locale,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  }
 
-const FEATURES = [
-  {
-    title: "Subsecciones como verdad de referencia",
-    body: "Lo explicado se guarda antes de tu recall, así la evaluación mide lo que de verdad cubriste — no la impresión del momento.",
-  },
-  {
-    title: "Repetición espaciada (SM-2)",
-    body: "El sistema calcula cuándo cada tema vuelve a tocar y arma tus sesiones de repaso por urgencia. Repasás justo antes de olvidar.",
-  },
-  {
-    title: "Teoría y práctica",
-    body: "Cada subsección es conceptual o práctica. Lo conceptual se explica; lo práctico te pone a resolver ejercicios — programación, mate, lo que sea.",
-  },
-  {
-    title: "Por grupos, a tu ritmo",
-    body: "Organizá temas en grupos (Python, Sistemas Operativos, Matemáticas…) y repasá un grupo o todo. Dificultad adaptativa opcional.",
-  },
-]
+  const steps = [
+    { n: "1", title: t("step1Title"), body: t("step1Body") },
+    { n: "2", title: t("step2Title"), body: t("step2Body") },
+    { n: "3", title: t("step3Title"), body: t("step3Body") },
+  ]
 
-export default function LandingPage() {
+  const features = [
+    { title: t("feature1Title"), body: t("feature1Body") },
+    { title: t("feature2Title"), body: t("feature2Body") },
+    { title: t("feature3Title"), body: t("feature3Body") },
+    { title: t("feature4Title"), body: t("feature4Body") },
+  ]
+
   return (
     <div className="min-h-screen">
       <script
@@ -75,10 +60,10 @@ export default function LandingPage() {
             href="/login"
             className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
           >
-            Iniciar sesión
+            {t("navSignIn")}
           </Link>
           <Button asChild size="sm">
-            <Link href="/signup">Crear cuenta</Link>
+            <Link href="/signup">{t("navSignUp")}</Link>
           </Button>
           <ThemeToggle />
         </nav>
@@ -94,19 +79,18 @@ export default function LandingPage() {
         <div className="mx-auto max-w-3xl px-6 pb-16 pt-16 text-center sm:pt-24">
           <LogoMark className="mx-auto size-14" />
           <h1 className="mt-6 font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-            Recordá lo que aprendés,
-            <br className="hidden sm:block" /> no solo lo que leés.
+            {t("heroTitleLine1")}
+            <br className="hidden sm:block" /> {t("heroTitleLine2")}
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-balance text-base text-muted-foreground sm:text-lg">
-            Recall convierte tus conversaciones con Claude en active recall: te explica un tema,
-            te hace recordarlo de memoria y registra cuánto retenés a lo largo del tiempo.
+            {t("heroSubtitle")}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="h-10 px-5 text-sm">
-              <Link href="/signup">Crear cuenta gratis</Link>
+              <Link href="/signup">{t("heroCtaPrimary")}</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="h-10 px-5 text-sm">
-              <Link href="#como-funciona">Ver cómo funciona</Link>
+              <Link href="#como-funciona">{t("heroCtaSecondary")}</Link>
             </Button>
           </div>
         </div>
@@ -115,10 +99,10 @@ export default function LandingPage() {
       {/* Cómo funciona */}
       <section id="como-funciona" className="mx-auto max-w-5xl px-6 py-16 scroll-mt-8">
         <h2 className="text-center font-heading text-2xl font-semibold tracking-tight">
-          Cómo funciona
+          {t("howItWorksTitle")}
         </h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          {STEPS.map((s) => (
+          {steps.map((s) => (
             <div key={s.n} className="rounded-xl border bg-card p-5">
               <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary/10 font-heading text-sm font-semibold text-primary">
                 {s.n}
@@ -133,10 +117,10 @@ export default function LandingPage() {
       {/* Por qué Recall */}
       <section className="mx-auto max-w-5xl px-6 py-12">
         <h2 className="text-center font-heading text-2xl font-semibold tracking-tight">
-          Por qué Recall
+          {t("whyTitle")}
         </h2>
         <div className="mt-10 grid gap-5 sm:grid-cols-2">
-          {FEATURES.map((f) => (
+          {features.map((f) => (
             <div key={f.title} className="rounded-xl border bg-card p-5">
               <h3 className="font-medium">{f.title}</h3>
               <p className="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
@@ -148,23 +132,23 @@ export default function LandingPage() {
       {/* CTA final */}
       <section className="mx-auto max-w-3xl px-6 py-16 text-center">
         <h2 className="font-heading text-3xl font-semibold tracking-tight">
-          Empezá a estudiar con intención
+          {t("ctaTitle")}
         </h2>
         <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-          Creá tu cuenta, conectá Claude Desktop y dejá que el sistema lleve la cuenta de tu memoria.
+          {t("ctaBody")}
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           <Button asChild size="lg" className="h-10 px-5 text-sm">
-            <Link href="/signup">Crear cuenta</Link>
+            <Link href="/signup">{t("ctaPrimary")}</Link>
           </Button>
           <Button asChild size="lg" variant="ghost" className="h-10 px-5 text-sm">
-            <Link href="/login">Ya tengo cuenta</Link>
+            <Link href="/login">{t("ctaSecondary")}</Link>
           </Button>
         </div>
       </section>
 
       <footer className="mx-auto max-w-5xl px-6 py-10 text-center flex items-center justify-center text-xs text-muted-foreground">
-        <div className="pr-1"><Logo className="opacity-70" /></div>  · Sistema de active recall personal
+        <div className="pr-1"><Logo className="opacity-70" /></div>  · {t("footerTagline")}
       </footer>
     </div>
   )

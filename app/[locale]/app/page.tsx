@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server"
 import { getTopics, getStudyStreak, getGroups, getUserTimezone, type TopicRow } from "@/lib/db"
 import { currentUserId } from "@/lib/auth"
 import { DashboardFilters } from "@/components/dashboard-filters"
@@ -34,6 +35,7 @@ function groupStats(topics: TopicRow[]): GroupStat[] {
 }
 
 export default async function DashboardPage() {
+  const t = await getTranslations("dashboard")
   const userId = await currentUserId()
   const [topics, streak, allGroups, tz] = await Promise.all([
     getTopics(userId),
@@ -49,7 +51,7 @@ export default async function DashboardPage() {
       <TimezoneSync stored={tz} />
       <AppHeader streak={streak} />
       <p className="-mt-4 mb-8 text-sm text-muted-foreground">
-        {topics.length} {topics.length === 1 ? "tema" : "temas"} · {groups.length} {groups.length === 1 ? "grupo" : "grupos"}
+        {t("topicCount", { count: topics.length })} · {t("groupCount", { count: groups.length })}
       </p>
 
       <GroupStatCards stats={stats} />

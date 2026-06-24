@@ -2,16 +2,13 @@
 
 import crypto from "crypto";
 import { redirect } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getServerSupabase } from "@/lib/supabase-server";
 
 // Token MCP: 32 bytes aleatorios en hex (64 chars, igual que los existentes).
 function generateMcpToken(): string {
   return crypto.randomBytes(32).toString("hex");
-}
-
-function fail(message: string): never {
-  redirect(`/signup?error=${encodeURIComponent(message)}`);
 }
 
 // Signup público. Crea (1) el usuario de Supabase Auth, (2) su fila de perfil en
@@ -23,12 +20,20 @@ function fail(message: string): never {
 // no verifica que el email sea del solicitante — aceptable para esta app personal,
 // revisar si crece.
 export async function signup(formData: FormData) {
+  const locale = await getLocale();
+  const t = await getTranslations({ locale, namespace: "auth" });
+
+  // Redirige a /signup con el mensaje de error (locale-aware).
+  function fail(message: string): never {
+    redirect(`/${locale}/signup?error=${encodeURIComponent(message)}`);
+  }
+
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
 
-  if (!name || !email || !password) fail("Completá nombre, email y contraseña.");
-  if (password.length < 8) fail("La contraseña debe tener al menos 8 caracteres.");
+  if (!name || !email || !password) fail(t("errFillAll"));
+  if (password.length < 8) fail(t("errPassword"));
 
   // 1) Crear el usuario de Auth.
   const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -39,7 +44,7 @@ export async function signup(formData: FormData) {
   });
   if (createErr || !created?.user) {
     // El caso típico es email ya registrado.
-    fail(createErr?.message?.includes("already") ? "Ese email ya tiene cuenta." : "No se pudo crear la cuenta.");
+    fail(createErr?.message?.includes("already") ? t("errEmailTaken") : t("errCreate"));
   }
   const authUser = created.user;
 
@@ -57,7 +62,7 @@ export async function signup(formData: FormData) {
     .single();
   if (insertErr || !profile) {
     await supabaseAdmin.auth.admin.deleteUser(authUser.id);
-    fail("No se pudo crear el perfil. Intentá de nuevo.");
+    fail(t("errProfile"));
   }
 
   // 3) Guardar users.id en app_metadata para que el middleware lo resuelva sin
@@ -68,13 +73,13 @@ export async function signup(formData: FormData) {
   if (metaErr) {
     await supabaseAdmin.from("users").delete().eq("id", profile.id);
     await supabaseAdmin.auth.admin.deleteUser(authUser.id);
-    fail("No se pudo finalizar el registro. Intentá de nuevo.");
+    fail(t("errFinalize"));
   }
 
   // Iniciar sesión y entrar al dashboard.
   const supabase = await getServerSupabase();
   const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-  if (signInErr) redirect("/login");
+  if (signInErr) redirect(`/${locale}/login`);
 
-  redirect("/app");
+  redirect(`/${locale}/app`);
 }

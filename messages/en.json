@@ -9,7 +9,41 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
-    "retry": "Retry"
+    "retry": "Retry",
+    "back": "Back"
+  },
+  "nav": {
+    "home": "Go to home",
+    "sessions": "Sessions",
+    "history": "History",
+    "prompt": "Prompt",
+    "settings": "Settings",
+    "logout": "Log out",
+    "streak": "🔥 {count, plural, one {# day} other {# days}}"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "loginHeading": "Recall",
+    "loginSubtitle": "Sign in to continue.",
+    "invalidCredentials": "Incorrect email or password.",
+    "email": "Email",
+    "password": "Password",
+    "loginSubmit": "Sign in",
+    "noAccount": "Don't have an account?",
+    "signupLink": "Create account",
+    "signupTitle": "Create account",
+    "signupSubtitle": "Start tracking your recall.",
+    "name": "Name",
+    "min8": "At least 8 characters.",
+    "signupSubmit": "Create account",
+    "haveAccount": "Already have an account?",
+    "loginLink": "Sign in",
+    "errFillAll": "Fill in name, email and password.",
+    "errPassword": "Password must be at least 8 characters.",
+    "errEmailTaken": "That email already has an account.",
+    "errCreate": "Could not create the account.",
+    "errProfile": "Could not create the profile. Try again.",
+    "errFinalize": "Could not finish signup. Try again."
   },
   "landing": {
     "navSignIn": "Sign in",
@@ -40,5 +74,14 @@
     "ctaPrimary": "Create account",
     "ctaSecondary": "I already have an account",
     "footerTagline": "Personal active recall system"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "We couldn't load this page. Try again; if it keeps failing, reload your browser.",
+    "retry": "Retry"
+  },
+  "dashboard": {
+    "topicCount": "{count, plural, one {# topic} other {# topics}}",
+    "groupCount": "{count, plural, one {# group} other {# groups}}"
   }
 }

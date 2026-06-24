@@ -9,7 +9,41 @@
     "cancel": "Cancelar",
     "delete": "Borrar",
     "edit": "Editar",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "back": "Volver"
+  },
+  "nav": {
+    "home": "Ir al inicio",
+    "sessions": "Sesiones",
+    "history": "Historial",
+    "prompt": "Prompt",
+    "settings": "Ajustes",
+    "logout": "Salir",
+    "streak": "🔥 {count, plural, one {# día} other {# días}}"
+  },
+  "auth": {
+    "loginTitle": "Iniciar sesión",
+    "loginHeading": "Recall",
+    "loginSubtitle": "Iniciá sesión para continuar.",
+    "invalidCredentials": "Email o contraseña incorrectos.",
+    "email": "Email",
+    "password": "Contraseña",
+    "loginSubmit": "Entrar",
+    "noAccount": "¿No tenés cuenta?",
+    "signupLink": "Crear cuenta",
+    "signupTitle": "Crear cuenta",
+    "signupSubtitle": "Empezá a registrar tu recall.",
+    "name": "Nombre",
+    "min8": "Mínimo 8 caracteres.",
+    "signupSubmit": "Crear cuenta",
+    "haveAccount": "¿Ya tenés cuenta?",
+    "loginLink": "Iniciá sesión",
+    "errFillAll": "Completá nombre, email y contraseña.",
+    "errPassword": "La contraseña debe tener al menos 8 caracteres.",
+    "errEmailTaken": "Ese email ya tiene cuenta.",
+    "errCreate": "No se pudo crear la cuenta.",
+    "errProfile": "No se pudo crear el perfil. Intentá de nuevo.",
+    "errFinalize": "No se pudo finalizar el registro. Intentá de nuevo."
   },
   "landing": {
     "navSignIn": "Iniciar sesión",
@@ -40,5 +74,14 @@
     "ctaPrimary": "Crear cuenta",
     "ctaSecondary": "Ya tengo cuenta",
     "footerTagline": "Sistema de active recall personal"
+  },
+  "error": {
+    "title": "Algo salió mal",
+    "body": "No pudimos cargar esta página. Probá de nuevo; si sigue fallando, recargá el navegador.",
+    "retry": "Reintentar"
+  },
+  "dashboard": {
+    "topicCount": "{count, plural, one {# tema} other {# temas}}",
+    "groupCount": "{count, plural, one {# grupo} other {# grupos}}"
   }
 }
