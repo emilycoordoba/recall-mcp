@@ -1,23 +1,42 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hasLocale } from "next-intl";
+import { routing } from "@/i18n/routing";
 import { USER_HEADER } from "./auth-constants";
 
-// Rutas que NO requieren sesión de dashboard (el MCP/OAuth tienen su propia auth
-// por token; login/signup son las páginas de entrada; "/" es el landing público).
+// Rutas (ya SIN prefijo de locale) que NO requieren sesión de dashboard. El
+// MCP/OAuth tienen su propia auth por token; login/signup son las páginas de
+// entrada; "/" es el landing público.
 const PUBLIC_PREFIXES = ["/login", "/signup", "/auth"];
 
-// El landing vive en "/" (exacto). El dashboard se movió a "/app".
+// `pathname` acá ya viene sin el prefijo de locale (ver splitLocale).
 function isPublic(pathname: string) {
   if (pathname === "/") return true;
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 
-// Refresca la sesión de Supabase Auth y resuelve el usuario. Si hay sesión,
-// propaga el users.id (int, leído de app_metadata) por el header USER_HEADER para
-// que `currentUserId()` lo use. Si no hay sesión y la ruta no es pública, redirige
-// a /login. Patrón estándar de @supabase/ssr para middleware (Edge).
-export async function updateSession(req: NextRequest): Promise<NextResponse> {
-  let res = NextResponse.next({ request: req });
+// Separa el prefijo de locale del resto del path. `/es/app` → { locale:"es",
+// bare:"/app" }. Si el primer segmento no es un locale soportado (p.ej. `/api/...`),
+// usa el default y deja el path intacto.
+function splitLocale(pathname: string): { locale: string; bare: string } {
+  const segments = pathname.split("/"); // "/es/app" → ["", "es", "app"]
+  const maybeLocale = segments[1];
+  if (hasLocale(routing.locales, maybeLocale)) {
+    const rest = "/" + segments.slice(2).join("/");
+    return { locale: maybeLocale, bare: rest === "/" ? "/" : rest.replace(/\/$/, "") || "/" };
+  }
+  return { locale: routing.defaultLocale, bare: pathname };
+}
+
+// Refresca la sesión de Supabase Auth y resuelve el usuario, ahora locale-aware.
+// `baseResponse` es la response que dejó el middleware de i18n (con su rewrite
+// interno y la cookie NEXT_LOCALE); la conservamos para no perder el ruteo de
+// idioma. Para /api y /auth se llama sin baseResponse (no se localizan).
+export async function updateSession(
+  req: NextRequest,
+  baseResponse?: NextResponse,
+): Promise<NextResponse> {
+  let res = baseResponse ?? NextResponse.next({ request: req });
 
   const supabase = createServerClient(
     process.env.SUPABASE_URL!,
@@ -29,7 +48,9 @@ export async function updateSession(req: NextRequest): Promise<NextResponse> {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
-          res = NextResponse.next({ request: req });
+          // Sin base de i18n recreamos la response; con base, escribimos las
+          // cookies de refresco sobre ella para no descartar su rewrite.
+          if (!baseResponse) res = NextResponse.next({ request: req });
           cookiesToSet.forEach(({ name, value, options }) =>
             res.cookies.set(name, value, options),
           );
@@ -41,19 +62,21 @@ export async function updateSession(req: NextRequest): Promise<NextResponse> {
   // getUser() revalida el token contra el auth server (no confiar en getSession()).
   const { data: { user } } = await supabase.auth.getUser();
   const { pathname } = req.nextUrl;
+  const { locale, bare } = splitLocale(pathname);
 
   if (!user) {
-    if (isPublic(pathname)) return res;
+    if (isPublic(bare)) return res;
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = `/${locale}/login`;
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  // Ya autenticado entrando al landing o a las páginas de entrada → al dashboard.
-  if (pathname === "/" || pathname === "/login" || pathname === "/signup") {
+  // Ya autenticado entrando al landing o a las páginas de entrada → al dashboard,
+  // conservando el idioma actual.
+  if (bare === "/" || bare === "/login" || bare === "/signup") {
     const url = req.nextUrl.clone();
-    url.pathname = "/app";
+    url.pathname = `/${locale}/app`;
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -62,9 +85,23 @@ export async function updateSession(req: NextRequest): Promise<NextResponse> {
   if (appUserId != null) {
     const headers = new Headers(req.headers);
     headers.set(USER_HEADER, String(appUserId));
-    const passthrough = NextResponse.next({ request: { headers } });
-    // Conserva las cookies de refresco que pudo setear getUser().
+
+    // Inyectar el header SIN descartar el rewrite interno de next-intl: si la
+    // response base trae x-middleware-rewrite, lo re-emitimos con los headers del
+    // request modificados; si no (rama /api), un next() normal.
+    const rewrite = res.headers.get("x-middleware-rewrite");
+    const passthrough = rewrite
+      ? NextResponse.rewrite(new URL(rewrite), { request: { headers } })
+      : NextResponse.next({ request: { headers } });
+
+    // Conservar cookies de refresco + headers que puso next-intl (NEXT_LOCALE,
+    // Link de alternates, Vary). El rewrite ya lo aplicó NextResponse.rewrite.
     res.cookies.getAll().forEach((c) => passthrough.cookies.set(c));
+    res.headers.forEach((value, key) => {
+      if (key === "x-middleware-rewrite" || key === "x-middleware-next") return;
+      if (key === "set-cookie") return; // ya copiadas vía cookies
+      passthrough.headers.set(key, value);
+    });
     return passthrough;
   }
 
