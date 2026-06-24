@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 
 // Nivel de dificultad (1-5) para práctica procedimental (mate). Tono violeta a
@@ -12,13 +13,14 @@ export function DifficultyBadge({
   title?: string
   className?: string
 }) {
+  const t = useTranslations("badges")
   return (
     <Badge
       variant="outline"
-      title={title ?? `Dificultad ${level}/5`}
+      title={title ?? t("difficultyTitle", { level })}
       className={`border-violet-500/30 bg-violet-500/10 font-normal text-violet-700 dark:text-violet-300 ${className ?? ""}`}
     >
-      Dif. {level}/5
+      {t("difficultyShort", { level })}
     </Badge>
   )
 }

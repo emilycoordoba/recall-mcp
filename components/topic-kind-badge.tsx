@@ -1,10 +1,5 @@
+import { useTranslations } from "next-intl"
 import type { TopicKind } from "@/lib/topic-kind"
-
-const LABELS: Record<TopicKind, string> = {
-  teorico: "teórico",
-  practico: "práctico",
-  teorico_practico: "teórico-práctico",
-}
 
 // Mismo lenguaje cromático que el chip por subsección (sky=teoría, violet=práctica);
 // el mixto combina ambos en un degradado tenue.
@@ -16,12 +11,14 @@ const STYLES: Record<TopicKind, string> = {
 }
 
 export function TopicKindBadge({ kind, className = "" }: { kind: TopicKind; className?: string }) {
+  const t = useTranslations("topicKind")
+  const label = t(kind)
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium leading-none ${STYLES[kind]} ${className}`}
-      title={`Tema ${LABELS[kind]}`}
+      title={t("badgeTitle", { label })}
     >
-      {LABELS[kind]}
+      {label}
     </span>
   )
 }

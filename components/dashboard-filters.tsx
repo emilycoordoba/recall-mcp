@@ -1,11 +1,12 @@
 "use client"
 
-import Link from "next/link"
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations, useLocale } from "next-intl"
 import { toast } from "sonner"
 import { IconTrash, IconArrowMerge, IconX } from "@tabler/icons-react"
 import { useConfirm } from "@/components/confirm-dialog"
+import { Link } from "@/i18n/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -37,11 +38,16 @@ function isProcedural(t: TopicRow) {
 
 type SortKey = "name" | "score_asc" | "score_desc" | "date_asc" | "date_desc" | "days_desc" | "days_asc" | "recalls_desc" | "recalls_asc" | "urgency_desc" | "urgency_asc" | "overdue_desc" | "overdue_asc"
 
-function formatDate(iso: string | null, tz: string) {
+// Mapea el locale de la app a un locale BCP-47 para Intl/toLocaleDateString.
+function dateLocale(locale: string) {
+  return locale === "en" ? "en-US" : "es-ES"
+}
+
+function formatDate(iso: string | null, tz: string, locale: string) {
   if (!iso) return "—"
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "—"
-  return d.toLocaleDateString("es-ES", { timeZone: tz, day: "2-digit", month: "short", year: "numeric" })
+  return d.toLocaleDateString(dateLocale(locale), { timeZone: tz, day: "2-digit", month: "short", year: "numeric" })
 }
 
 function daysSince(iso: string | null): number | null {
@@ -52,8 +58,9 @@ function daysSince(iso: string | null): number | null {
 }
 
 // Helpers de API para grupos de un topic. Devuelven el resultado (o null/false)
-// para que cada caller decida cómo reconciliar el estado local.
-async function apiAddGroup(topicId: number, name: string): Promise<GroupRef | null> {
+// para que cada caller decida cómo reconciliar el estado local. El mensaje de
+// error ya viene traducido del caller (estos helpers están fuera de React).
+async function apiAddGroup(topicId: number, name: string, errMsg: string): Promise<GroupRef | null> {
   const res = await fetch(`/api/topics/${topicId}/groups`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,18 +68,18 @@ async function apiAddGroup(topicId: number, name: string): Promise<GroupRef | nu
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    toast.error(data.error ?? "No se pudo agregar el grupo")
+    toast.error(data.error ?? errMsg)
     return null
   }
   const { group } = (await res.json()) as { group: GroupRef }
   return group
 }
 
-async function apiRemoveGroup(topicId: number, groupId: number): Promise<boolean> {
+async function apiRemoveGroup(topicId: number, groupId: number, errMsg: string): Promise<boolean> {
   const res = await fetch(`/api/topics/${topicId}/groups?groupId=${groupId}`, { method: "DELETE" })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))
-    toast.error(data.error ?? "No se pudo quitar el grupo")
+    toast.error(data.error ?? errMsg)
     return false
   }
   return true
@@ -102,13 +109,14 @@ function RetentionBadge({ score, effectiveScore, retention }: { score: number | 
 }
 
 function NextReviewCell({ daysOverdue, dimmed }: { daysOverdue: number | null; dimmed?: boolean }) {
+  const t = useTranslations("filters")
   if (daysOverdue === null) return <span className="text-muted-foreground font-mono text-xs">—</span>
   if (daysOverdue > 0) {
     const cls = dimmed ? "text-muted-foreground" : "text-destructive"
     return <span className={`${cls} font-mono text-xs`}>+{daysOverdue}d</span>
   }
-  if (daysOverdue === 0) return <span className="text-yellow-600 dark:text-yellow-400 font-mono text-xs">hoy</span>
-  return <span className="text-muted-foreground font-mono text-xs">en {-daysOverdue}d</span>
+  if (daysOverdue === 0) return <span className="text-yellow-600 dark:text-yellow-400 font-mono text-xs">{t("today")}</span>
+  return <span className="text-muted-foreground font-mono text-xs">{t("inDays", { days: -daysOverdue })}</span>
 }
 
 // El color rojo de "vencido" solo se justifica cuando el agendado se apoya en
@@ -128,6 +136,7 @@ function TrendIndicator({ trend }: { trend: "up" | "down" | "flat" | null }) {
 }
 
 function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: number, newName: string) => Promise<void> }) {
+  const t = useTranslations("filters")
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(topic.name)
   const [saving, setSaving] = useState(false)
@@ -176,7 +185,7 @@ function TopicNameCell({ topic, onRename }: { topic: TopicRow; onRename: (id: nu
       <TopicKindBadge kind={topic.kind} />
       <button
         onClick={startEdit}
-        title="Editar nombre"
+        title={t("editName")}
         className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-muted-foreground transition-opacity text-xs leading-none"
       >
         ✎
@@ -200,6 +209,7 @@ function RowActions({
   // móvil (tarjetas) no hay hover, así que se muestran siempre.
   alwaysVisible?: boolean
 }) {
+  const t = useTranslations("filters")
   const confirm = useConfirm()
   const [merging, setMerging] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -208,9 +218,9 @@ function RowActions({
     const target = targets.find((t) => String(t.id) === targetId)
     if (!target) return
     const ok = await confirm({
-      title: `¿Fusionar "${topic.name}" dentro de "${target.name}"?`,
-      description: `Sus recalls y subsecciones se moverán y "${topic.name}" se eliminará.`,
-      confirmText: "Fusionar",
+      title: t("mergeConfirmTitle", { source: topic.name, target: target.name }),
+      description: t("mergeConfirmDesc", { source: topic.name }),
+      confirmText: t("mergeConfirm"),
     })
     if (!ok) return
     setBusy(true)
@@ -221,9 +231,9 @@ function RowActions({
 
   async function remove() {
     const ok = await confirm({
-      title: `¿Borrar "${topic.name}"?`,
-      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
-      confirmText: "Borrar tema",
+      title: t("deleteConfirmTitle", { name: topic.name }),
+      description: t("deleteConfirmDesc"),
+      confirmText: t("deleteConfirm"),
       destructive: true,
     })
     if (!ok) return
@@ -238,7 +248,7 @@ function RowActions({
       <div className="flex items-center justify-end gap-1">
         <Select disabled={busy || targets.length === 0} onValueChange={pickTarget}>
           <SelectTrigger className="h-7 w-44 px-2 py-1 text-xs">
-            <SelectValue placeholder={targets.length ? "Fusionar con…" : "Sin destinos"} />
+            <SelectValue placeholder={targets.length ? t("mergeWith") : t("noTargets")} />
           </SelectTrigger>
           <SelectContent>
             {targets.map((t) => (
@@ -248,7 +258,7 @@ function RowActions({
             ))}
           </SelectContent>
         </Select>
-        <Button variant="ghost" size="icon" className="size-7" disabled={busy} title="Cancelar" onClick={() => setMerging(false)}>
+        <Button variant="ghost" size="icon" className="size-7" disabled={busy} title={t("cancel")} onClick={() => setMerging(false)}>
           <IconX className="size-3.5" />
         </Button>
       </div>
@@ -257,10 +267,10 @@ function RowActions({
 
   return (
     <div className={`flex items-center justify-end gap-0.5${alwaysVisible ? "" : " opacity-0 group-hover/row:opacity-100 transition-opacity"}`}>
-      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title="Fusionar con otro tema" onClick={() => setMerging(true)}>
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground" disabled={busy} title={t("mergeWithOther")} onClick={() => setMerging(true)}>
         <IconArrowMerge className="size-3.5" />
       </Button>
-      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title="Borrar tema" onClick={remove}>
+      <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" disabled={busy} title={t("deleteTopic")} onClick={remove}>
         <IconTrash className="size-3.5" />
       </Button>
     </div>
@@ -295,6 +305,8 @@ function MobileTopicCard({
   onDelete: (id: number) => Promise<void>
   tz: string
 }) {
+  const t = useTranslations("filters")
+  const locale = useLocale()
   return (
     <div
       data-state={selected ? "selected" : undefined}
@@ -304,7 +316,7 @@ function MobileTopicCard({
         <div className="flex items-start gap-2.5">
           <input
             type="checkbox"
-            aria-label={`Seleccionar ${topic.name}`}
+            aria-label={t("selectAria", { name: topic.name })}
             className="mt-1 size-4 shrink-0 accent-primary"
             checked={selected}
             onChange={onToggle}
@@ -324,7 +336,7 @@ function MobileTopicCard({
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
-          Puntaje:
+          {t("scoreLabel")}
           <RetentionBadge score={topic.last_score} effectiveScore={topic.effective_score} retention={topic.retention} />
           <TrendIndicator trend={topic.score_trend} />
         </span>
@@ -333,15 +345,15 @@ function MobileTopicCard({
             level={topic.last_difficulty ?? topic.suggested_difficulty}
             title={
               topic.last_difficulty === null
-                ? `Dificultad sugerida ${topic.suggested_difficulty}/5 (aún sin registrar)`
-                : `Dificultad actual ${topic.last_difficulty}/5 · próxima sugerida ${topic.suggested_difficulty}/5`
+                ? t("diffSuggested", { level: topic.suggested_difficulty })
+                : t("diffCurrent", { current: topic.last_difficulty, suggested: topic.suggested_difficulty })
             }
           />
         )}
-        <span>Último: {formatDate(topic.last_recalled_at, tz)}</span>
-        <span>{topic.total_recalls} recall{topic.total_recalls === 1 ? "" : "s"}</span>
+        <span>{t("lastLabel", { date: formatDate(topic.last_recalled_at, tz, locale) })}</span>
+        <span>{t("recallCount", { count: topic.total_recalls })}</span>
         <span className="inline-flex items-center gap-1">
-          Próxima: <NextReviewCell daysOverdue={topic.days_overdue} dimmed={scheduleSignalDimmed(topic)} />
+          {t("nextLabel")} <NextReviewCell daysOverdue={topic.days_overdue} dimmed={scheduleSignalDimmed(topic)} />
         </span>
       </div>
     </div>
@@ -358,6 +370,8 @@ interface Props {
 export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
+  const t = useTranslations("filters")
+  const locale = useLocale()
   const [localTopics, setLocalTopics] = useState(topics)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -388,7 +402,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "Error al renombrar")
+      toast.error(data.error ?? t("toastRenameError"))
     } else {
       router.refresh()
     }
@@ -411,9 +425,9 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "Error al borrar")
+      toast.error(data.error ?? t("toastDeleteError"))
     } else {
-      toast.success("Tema borrado")
+      toast.success(t("toastDeleted"))
       router.refresh()
     }
   }
@@ -430,16 +444,16 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     if (!res.ok) {
       setLocalTopics(prev)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "Error al fusionar")
+      toast.error(data.error ?? t("toastMergeError"))
     } else {
-      toast.success("Temas fusionados")
+      toast.success(t("toastMerged"))
       router.refresh()
     }
   }
 
   // --- Grupos por fila (optimista) ---
   async function addGroupToTopic(topicId: number, name: string) {
-    const group = await apiAddGroup(topicId, name)
+    const group = await apiAddGroup(topicId, name, t("toastAddGroupError"))
     if (!group) return
     setLocalTopics((ts) => ts.map((t) => {
       if (t.id !== topicId || t.groups.some((g) => g.id === group.id)) return t
@@ -451,7 +465,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
   async function removeGroupFromTopic(topicId: number, groupId: number) {
     const prev = localTopics
     setLocalTopics((ts) => ts.map((t) => t.id === topicId ? { ...t, groups: t.groups.filter((g) => g.id !== groupId) } : t))
-    const ok = await apiRemoveGroup(topicId, groupId)
+    const ok = await apiRemoveGroup(topicId, groupId, t("toastRemoveGroupError"))
     if (!ok) { setLocalTopics(prev); return }
     router.refresh()
   }
@@ -470,7 +484,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     const ids = [...selected]
     if (ids.length === 0) return
     setBulkBusy(true)
-    const results = await Promise.all(ids.map((id) => apiAddGroup(id, name)))
+    const results = await Promise.all(ids.map((id) => apiAddGroup(id, name, t("toastAddGroupError"))))
     setLocalTopics((ts) => ts.map((t) => {
       const idx = ids.indexOf(t.id)
       const group = idx === -1 ? null : results[idx]
@@ -485,7 +499,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     const ids = selectedTopics.filter((t) => t.groups.some((g) => g.id === groupId)).map((t) => t.id)
     if (ids.length === 0) return
     setBulkBusy(true)
-    const results = await Promise.all(ids.map((id) => apiRemoveGroup(id, groupId)))
+    const results = await Promise.all(ids.map((id) => apiRemoveGroup(id, groupId, t("toastRemoveGroupError"))))
     const okIds = ids.filter((_, i) => results[i])
     setLocalTopics((ts) => ts.map((t) => okIds.includes(t.id) ? { ...t, groups: t.groups.filter((g) => g.id !== groupId) } : t))
     setBulkBusy(false)
@@ -496,9 +510,9 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
     const ids = selectedTopics.map((t) => t.id)
     if (ids.length === 0) return
     const ok = await confirm({
-      title: `¿Borrar ${ids.length} tema${ids.length === 1 ? "" : "s"}?`,
-      description: "Se borra también todo su historial. Esta acción no se puede deshacer.",
-      confirmText: "Borrar",
+      title: t("bulkDeleteTitle", { count: ids.length }),
+      description: t("deleteConfirmDesc"),
+      confirmText: t("bulkDelete"),
       destructive: true,
     })
     if (!ok) return
@@ -512,10 +526,9 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       // Restaura solo los que fallaron; los borrados con éxito quedan fuera.
       const failedTopics = prev.filter((t) => failedIds.includes(t.id))
       setLocalTopics((ts) => [...ts, ...failedTopics])
-      toast.error(`No se pudieron borrar ${failedIds.length} de ${ids.length} temas.`)
+      toast.error(t("bulkDeletePartial", { failed: failedIds.length, total: ids.length }))
     } else {
-      const n = ids.length
-      toast.success(`${n} tema${n === 1 ? "" : "s"} borrado${n === 1 ? "" : "s"}`)
+      toast.success(t("bulkDeleted", { count: ids.length }))
     }
     setSelected((s) => {
       const next = new Set(s)
@@ -573,7 +586,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       <div className="flex flex-wrap gap-3">
         <input
           type="search"
-          placeholder="Buscar tema…"
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-7 w-48 rounded-md border border-input bg-input/20 px-2 py-1.5 text-xs placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 dark:bg-input/30"
@@ -581,10 +594,10 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
 
         <Select value={group} onValueChange={(v) => { setGroup(v); localStorage.setItem("dashboard-group", v) }}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Todos los grupos" />
+            <SelectValue placeholder={t("allGroups")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los grupos</SelectItem>
+            <SelectItem value="all">{t("allGroups")}</SelectItem>
             {groups.map((g) => (
               <SelectItem key={g} value={g}>{g}</SelectItem>
             ))}
@@ -593,34 +606,34 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
 
         <Select value={kind} onValueChange={(v) => { const k = v as "all" | TopicKind; setKind(k); localStorage.setItem("dashboard-kind", k) }}>
           <SelectTrigger className="w-44">
-            <SelectValue placeholder="Todos los tipos" />
+            <SelectValue placeholder={t("allKinds")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los tipos</SelectItem>
-            <SelectItem value="teorico">Teóricos</SelectItem>
-            <SelectItem value="practico">Prácticos</SelectItem>
-            <SelectItem value="teorico_practico">Teórico-prácticos</SelectItem>
+            <SelectItem value="all">{t("allKinds")}</SelectItem>
+            <SelectItem value="teorico">{t("kindTeorico")}</SelectItem>
+            <SelectItem value="practico">{t("kindPractico")}</SelectItem>
+            <SelectItem value="teorico_practico">{t("kindTeoricoPractico")}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={sort} onValueChange={(v) => { const k = v as SortKey; setSort(k); localStorage.setItem("dashboard-sort", k) }}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Ordenar" />
+            <SelectValue placeholder={t("sortPlaceholder")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="name">Orden: Nombre</SelectItem>
-            <SelectItem value="score_desc">Orden: Puntaje ↓</SelectItem>
-            <SelectItem value="score_asc">Orden: Puntaje ↑</SelectItem>
-            <SelectItem value="date_desc">Orden: Fecha ↓</SelectItem>
-            <SelectItem value="date_asc">Orden: Fecha ↑</SelectItem>
-            <SelectItem value="days_desc">Orden: Días ↓</SelectItem>
-            <SelectItem value="days_asc">Orden: Días ↑</SelectItem>
-            <SelectItem value="recalls_desc">Orden: Recalls ↓</SelectItem>
-            <SelectItem value="recalls_asc">Orden: Recalls ↑</SelectItem>
-            <SelectItem value="urgency_desc">Orden: Urgencia ↓</SelectItem>
-            <SelectItem value="urgency_asc">Orden: Urgencia ↑</SelectItem>
-            <SelectItem value="overdue_desc">Orden: Próxima ↓</SelectItem>
-            <SelectItem value="overdue_asc">Orden: Próxima ↑</SelectItem>
+            <SelectItem value="name">{t("sortName")}</SelectItem>
+            <SelectItem value="score_desc">{t("sortScoreDesc")}</SelectItem>
+            <SelectItem value="score_asc">{t("sortScoreAsc")}</SelectItem>
+            <SelectItem value="date_desc">{t("sortDateDesc")}</SelectItem>
+            <SelectItem value="date_asc">{t("sortDateAsc")}</SelectItem>
+            <SelectItem value="days_desc">{t("sortDaysDesc")}</SelectItem>
+            <SelectItem value="days_asc">{t("sortDaysAsc")}</SelectItem>
+            <SelectItem value="recalls_desc">{t("sortRecallsDesc")}</SelectItem>
+            <SelectItem value="recalls_asc">{t("sortRecallsAsc")}</SelectItem>
+            <SelectItem value="urgency_desc">{t("sortUrgencyDesc")}</SelectItem>
+            <SelectItem value="urgency_asc">{t("sortUrgencyAsc")}</SelectItem>
+            <SelectItem value="overdue_desc">{t("sortOverdueDesc")}</SelectItem>
+            <SelectItem value="overdue_asc">{t("sortOverdueAsc")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -628,10 +641,10 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       {/* Barra de acciones masivas — aparece al seleccionar filas */}
       {selectedTopics.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2 text-sm">
-          <span className="font-medium">{selectedTopics.length} seleccionado{selectedTopics.length === 1 ? "" : "s"}</span>
+          <span className="font-medium">{t("selectedCount", { count: selectedTopics.length })}</span>
 
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            Agrupar en
+            {t("bulkGroupInto")}
             <GroupCombobox
               allGroups={allGroups}
               exclude={[]}
@@ -643,7 +656,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
           {groupsInSelection.length > 0 && (
             <Select disabled={bulkBusy} onValueChange={(v) => bulkRemoveGroup(Number(v))}>
               <SelectTrigger className="h-7 w-44 px-2 py-1 text-xs">
-                <SelectValue placeholder="Quitar de…" />
+                <SelectValue placeholder={t("bulkRemoveFrom")} />
               </SelectTrigger>
               <SelectContent>
                 {groupsInSelection.map((g) => (
@@ -663,10 +676,10 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
             onClick={bulkDelete}
           >
             <IconTrash className="size-3.5" />
-            Borrar
+            {t("bulkDelete")}
           </Button>
           <Button variant="ghost" size="sm" className="h-7 text-xs" disabled={bulkBusy} onClick={() => setSelected(new Set())}>
-            Limpiar selección
+            {t("clearSelection")}
           </Button>
         </div>
       )}
@@ -679,27 +692,27 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
               <TableHead className="w-px">
                 <input
                   type="checkbox"
-                  aria-label="Seleccionar todos"
+                  aria-label={t("selectAll")}
                   className="size-4 align-middle accent-primary"
                   checked={allFilteredSelected}
                   ref={(el) => { if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected }}
                   onChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead>Tema</TableHead>
-              <TableHead>Grupo</TableHead>
-              <TableHead className="text-center">Último puntaje</TableHead>
-              <TableHead>Último recall</TableHead>
-              <TableHead className="text-right">Recalls</TableHead>
-              <TableHead className="text-right">Próxima</TableHead>
-              <TableHead className="w-px text-right"><span className="sr-only">Acciones</span></TableHead>
+              <TableHead>{t("colTopic")}</TableHead>
+              <TableHead>{t("colGroup")}</TableHead>
+              <TableHead className="text-center">{t("colLastScore")}</TableHead>
+              <TableHead>{t("colLastRecall")}</TableHead>
+              <TableHead className="text-right">{t("colRecalls")}</TableHead>
+              <TableHead className="text-right">{t("colNext")}</TableHead>
+              <TableHead className="w-px text-right"><span className="sr-only">{t("colActions")}</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
-                  No se encontraron temas
+                  {t("noTopics")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -708,7 +721,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
                     <TableCell>
                       <input
                         type="checkbox"
-                        aria-label={`Seleccionar ${topic.name}`}
+                        aria-label={t("selectAria", { name: topic.name })}
                         className="size-4 align-middle accent-primary"
                         checked={selected.has(topic.id)}
                         onChange={() => toggleSelect(topic.id)}
@@ -736,15 +749,15 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
                             level={topic.last_difficulty ?? topic.suggested_difficulty}
                             title={
                               topic.last_difficulty === null
-                                ? `Dificultad sugerida ${topic.suggested_difficulty}/5 (aún sin registrar)`
-                                : `Dificultad actual ${topic.last_difficulty}/5 · próxima sugerida ${topic.suggested_difficulty}/5`
+                                ? t("diffSuggested", { level: topic.suggested_difficulty })
+                                : t("diffCurrent", { current: topic.last_difficulty, suggested: topic.suggested_difficulty })
                             }
                           />
                         </div>
                       )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(topic.last_recalled_at, tz)}
+                      {formatDate(topic.last_recalled_at, tz, locale)}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs text-muted-foreground">
                       {topic.total_recalls}
@@ -770,7 +783,7 @@ export function DashboardFilters({ topics, groups, allGroups, tz }: Props) {
       {/* Tarjetas — solo móvil (< md) */}
       <div className="mt-6 space-y-3 md:hidden">
         {filtered.length === 0 ? (
-          <p className="py-12 text-center text-muted-foreground">No se encontraron temas</p>
+          <p className="py-12 text-center text-muted-foreground">{t("noTopics")}</p>
         ) : (
           filtered.map((topic) => (
             <MobileTopicCard

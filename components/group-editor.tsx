@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { IconX, IconPlus } from "@tabler/icons-react"
 
@@ -23,6 +24,7 @@ export function GroupCombobox({
   onPick: (name: string) => void
   disabled?: boolean
 }) {
+  const t = useTranslations("groups")
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -62,7 +64,7 @@ export function GroupCombobox({
         className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-muted-foreground/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:border-muted-foreground/70 hover:text-foreground disabled:opacity-50"
       >
         <IconPlus className="size-3" />
-        grupo
+        {t("addButton")}
       </button>
 
       {open && (
@@ -70,7 +72,7 @@ export function GroupCombobox({
           <input
             autoFocus
             value={query}
-            placeholder="Buscar o crear…"
+            placeholder={t("searchPlaceholder")}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -99,11 +101,11 @@ export function GroupCombobox({
                 onClick={() => pick(query)}
                 className="block w-full truncate rounded-sm px-1.5 py-1 text-left text-xs text-muted-foreground hover:bg-accent"
               >
-                + Crear «{query.trim()}»
+                {t("createOption", { name: query.trim() })}
               </button>
             )}
             {candidates.length === 0 && !q && (
-              <p className="px-1.5 py-1 text-xs text-muted-foreground">Escribí para crear un grupo…</p>
+              <p className="px-1.5 py-1 text-xs text-muted-foreground">{t("emptyHint")}</p>
             )}
           </div>
         </div>
@@ -127,6 +129,7 @@ export function GroupChips({
   onRemove: (group: GroupRef) => void
   busy?: boolean
 }) {
+  const t = useTranslations("groups")
   return (
     <span className="flex flex-wrap items-center gap-1">
       {groups.map((g) => (
@@ -136,7 +139,7 @@ export function GroupChips({
             type="button"
             onClick={() => onRemove(g)}
             disabled={busy}
-            title={`Quitar de "${g.name}"`}
+            title={t("removeTitle", { name: g.name })}
             className="rounded-sm text-muted-foreground hover:text-destructive disabled:opacity-50"
           >
             <IconX className="size-3" />

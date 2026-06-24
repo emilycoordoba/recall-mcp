@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { IconX } from "@tabler/icons-react"
 import { useConfirm } from "@/components/confirm-dialog"
@@ -20,14 +21,15 @@ export interface GroupStat {
 export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
   const router = useRouter()
   const confirm = useConfirm()
+  const t = useTranslations("groups")
   const [localStats, setLocalStats] = useState(stats)
   const [busyId, setBusyId] = useState<number | null>(null)
 
   async function deleteGroup(g: GroupStat) {
     const ok = await confirm({
-      title: `¿Borrar el grupo "${g.name}"?`,
-      description: `Sus ${g.count} tema${g.count === 1 ? "" : "s"} no se borran, solo dejan de pertenecer a este grupo.`,
-      confirmText: "Borrar grupo",
+      title: t("deleteTitle", { name: g.name }),
+      description: t("deleteDescription", { count: g.count }),
+      confirmText: t("deleteConfirm"),
       destructive: true,
     })
     if (!ok) return
@@ -39,7 +41,7 @@ export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
     if (!res.ok) {
       setLocalStats(prev)
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error ?? "No se pudo borrar el grupo")
+      toast.error(data.error ?? t("deleteError"))
       return
     }
     router.refresh()
@@ -55,7 +57,7 @@ export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
             type="button"
             onClick={() => deleteGroup(g)}
             disabled={busyId === g.id}
-            title={`Borrar grupo "${g.name}"`}
+            title={t("deleteButtonTitle", { name: g.name })}
             className="absolute right-1.5 top-1.5 rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/card:opacity-100 disabled:opacity-50"
           >
             <IconX className="size-3.5" />
@@ -64,9 +66,9 @@ export function GroupStatCards({ stats }: { stats: GroupStat[] }) {
           <p className="mt-1 text-xl font-semibold tabular-nums">
             {g.avg_score?.toFixed(1) ?? "—"}
           </p>
-          <p className="text-xs text-muted-foreground">{g.count} tema{g.count !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-muted-foreground">{t("topicsCount", { count: g.count })}</p>
           {g.below3 > 0 && (
-            <p className="text-xs text-destructive">{g.below3} bajo 3.0</p>
+            <p className="text-xs text-destructive">{t("below3", { count: g.below3 })}</p>
           )}
         </div>
       ))}
