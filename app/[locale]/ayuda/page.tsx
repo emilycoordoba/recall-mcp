@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 import { getTranslations, setRequestLocale } from "next-intl/server"
 import { Logo } from "@/components/logo"
-import { Button } from "@/components/ui/button"
+// import { Button } from "@/components/ui/button" // usado solo en la sección de contacto (oculta)
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
 import { Link } from "@/i18n/navigation"
-import { SUPPORT_EMAIL } from "@/lib/site"
+// import { SUPPORT_EMAIL } from "@/lib/site" // contacto oculto por ahora (ver abajo)
 
 export async function generateMetadata({
   params,
@@ -40,8 +40,10 @@ export default async function HelpPage({
   setRequestLocale(locale)
   const t = await getTranslations("help")
 
-  // FAQ: 6 pares pregunta/respuesta en el namespace `help` (q1..q6 / a1..a6).
-  const faqs = [1, 2, 3, 4, 5, 6].map((n) => ({
+  // FAQ: pares pregunta/respuesta en el namespace `help` (q1..q6 / a1..a6). La q6
+  // (cómo contactar) queda oculta junto con la sección de contacto hasta tener una
+  // casilla de soporte dedicada; volver a [1..6] al reactivarla.
+  const faqs = [1, 2, 3, 4, 5].map((n) => ({
     q: t(`q${n}`),
     a: t(`a${n}`),
   }))
@@ -91,7 +93,9 @@ export default async function HelpPage({
           ))}
         </dl>
 
-        {/* Contacto */}
+        {/* Contacto por email: oculto hasta definir una casilla de soporte dedicada
+            (no exponer el correo personal). Reactivar junto con la q6 y el footer del
+            landing cuando SUPPORT_EMAIL apunte a la casilla nueva.
         <section className="mt-12 rounded-xl border bg-card p-6 text-center">
           <h2 className="font-heading text-xl font-semibold tracking-tight">
             {t("contactTitle")}
@@ -103,6 +107,7 @@ export default async function HelpPage({
             <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
           </Button>
         </section>
+        */}
 
         <p className="mt-10 text-center text-sm">
           <Link

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
 import { Link } from "@/i18n/navigation"
-import { SITE_URL, SITE_NAME, SUPPORT_EMAIL } from "@/lib/site"
+import { SITE_URL, SITE_NAME /*, SUPPORT_EMAIL */ } from "@/lib/site"
 
 export async function generateMetadata({
   params,
@@ -185,12 +185,16 @@ export default async function LandingPage({
           >
             {t("footerHelp")}
           </Link>
+          {/* Soporte por email: oculto hasta definir una casilla de soporte dedicada
+              (no exponer el correo personal). Reactivar cuando SUPPORT_EMAIL apunte
+              a la casilla nueva. Ver lib/site.ts (NEXT_PUBLIC_SUPPORT_EMAIL).
           <a
             href={`mailto:${SUPPORT_EMAIL}`}
             className="underline-offset-4 hover:text-foreground hover:underline"
           >
             {t("footerSupport")}
           </a>
+          */}
         </nav>
       </footer>
     </div>
