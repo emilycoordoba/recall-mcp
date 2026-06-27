@@ -5,8 +5,8 @@ import { routing } from "@/i18n/routing";
 
 // Rutas (ya SIN prefijo de locale) que NO requieren sesión de dashboard. El
 // MCP/OAuth tienen su propia auth por token; login/signup son las páginas de
-// entrada; "/" es el landing público.
-const PUBLIC_PREFIXES = ["/login", "/signup", "/auth"];
+// entrada; "/" es el landing público; "/ayuda" es la FAQ pública (indexable).
+const PUBLIC_PREFIXES = ["/login", "/signup", "/auth", "/ayuda"];
 
 // `pathname` acá ya viene sin el prefijo de locale (ver splitLocale).
 export function isPublic(pathname: string) {

@@ -48,7 +48,8 @@ npm run format       # prettier sobre **/*.{ts,tsx}
 
 | Ruta | Qué hace |
 |---|---|
-| `/` | **Landing público** (estático, sin auth): hero + cómo funciona + features + CTA a `/signup`. Usuarios con sesión que entran aquí se redirigen a `/app` (middleware). `app/page.tsx`. |
+| `/` | **Landing público** (estático, sin auth): hero + cómo funciona + features + CTA a `/signup`. Usuarios con sesión que entran aquí se redirigen a `/app` (middleware). `app/[locale]/page.tsx`. Footer con links a `/ayuda` y `mailto:` de soporte. |
+| `/ayuda` | **FAQ/centro de ayuda público** (estático, sin auth, indexable): 6 preguntas frecuentes + contacto por email (`SUPPORT_EMAIL`). Bilingüe; JSON-LD `FAQPage`. En el sitemap; `isPublic` lo deja pasar sin sesión. `app/[locale]/ayuda/page.tsx`. |
 | `/app` | **Dashboard** (requiere sesión). Lista todos los topics con último score, fecha y total de recalls. Filtra por grupo y por **tipo** (teórico/práctico/teórico-práctico), ordena. Cada fila muestra un badge con el tipo derivado. **Editable**: renombrar topic inline, fusionar dentro de otro y borrar (acciones por fila al hover); **grupos por fila con chips agregar/quitar** (mismo combobox que el detalle); **selección múltiple** (checkbox por fila + "seleccionar todo") con barra de acciones masivas (agrupar/quitar de un grupo en lote); **borrar un grupo entero** desde su tarjeta de resumen (× al hover; no borra sus topics). |
 | `/topics/[id]` | Detalle de un topic. **Editable**: nombre y descripción inline, **grupos (varios) con chips agregar/quitar**, renombrar subsecciones y **reclasificar su kind** (chip teoría/práctica), borrar topic, borrar/editar feedback de recalls del historial, y **editar/quitar la dificultad de un quick review** (el badge violeta del historial es un Select 1-5 + "Sin dificultad"; red de seguridad para cuando el modelo no manda el param `difficulty`). Muestra un badge con el tipo derivado del topic (teórico/práctico/teórico-práctico). |
 | `/settings` | Ajustes por usuario: "repaso solo con temas estrenados", **cantidad de temas por sesión** (`review_slots`, 2–6, default 4; server-enforced en `get_review_plan`), **ajuste automático** (`review_slots_auto`: dimensiona la sesión a los temas vencidos hasta el tope `review_slots`) y **dificultad adaptativa en vivo** (`adaptive_difficulty` + `difficulty_pace` suave/normal/exigente, soft prefs que `get_review_plan` expone para que la IA las honre). Ver `docs/METODOLOGIA.md`. |
@@ -124,10 +125,12 @@ y `await confirm({…})` vía `useConfirm()`. **UI bilingüe (next-intl)**: ES (
 `app/[locale]/layout.tsx` define `metadataBase` + OpenGraph/Twitter + keywords y
 `generateMetadata` por locale (canonical + hreflang `es`/`en`/`x-default`,
 `og:locale`); OG image dinámica en `app/opengraph-image.tsx`; `/robots.txt` y
-`/sitemap.xml` (bilingües) por archivo (`app/robots.ts` / `app/sitemap.ts`); JSON-LD
-(`WebApplication`, `inLanguage`) en el landing; rutas auth-gated en `noindex` +
-disallow. El matcher del middleware **excluye** robots/sitemap/OG/manifest/iconos
-para que un crawler sin sesión no sea redirigido a `/login`. **Responsive**: lista de temas
+`/sitemap.xml` (bilingües, incluye `/ayuda`) por archivo (`app/robots.ts` /
+`app/sitemap.ts`); JSON-LD `WebApplication` en el landing y `FAQPage` en `/ayuda`
+(ambos `inLanguage`); verificación de Search Console vía `GOOGLE_SITE_VERIFICATION`
+(meta-tag en el layout); rutas auth-gated en `noindex` + disallow. El matcher del
+middleware **excluye** robots/sitemap/OG/manifest/iconos y `isPublic` deja pasar
+`/` y `/ayuda` sin sesión, para que un crawler no sea redirigido a `/login`. **Responsive**: lista de temas
 en tabla (≥md) o tarjetas (<md, `MobileTopicCard`). **PWA** instalable vía
 `app/manifest.ts` (sin offline). Modo claro/oscuro con `next-themes` (toggle en el
 header + atajo `d`). Ver `docs/app.md` → "Sistema visual".
@@ -175,6 +178,12 @@ Variables de entorno necesarias:
 - `NEXT_PUBLIC_SITE_URL` *(opcional)* — URL canónica del sitio para metadata/OG,
   sitemap y robots (`lib/site.ts`). Por defecto el alias de prod en Vercel; setéala
   si conectás un dominio propio.
+- `GOOGLE_SITE_VERIFICATION` *(opcional)* — código del meta-tag de Google Search
+  Console. Si está, `app/[locale]/layout.tsx` emite el `<meta name="google-site-verification">`
+  para verificar la propiedad del sitio. Necesario una sola vez para que Google
+  empiece a indexar (luego enviar `/sitemap.xml` en Search Console).
+- `NEXT_PUBLIC_SUPPORT_EMAIL` *(opcional)* — email de soporte que se muestra en el
+  footer y en `/ayuda` (`lib/site.ts`, `SUPPORT_EMAIL`). Por defecto el personal.
 
 ## Gotchas
 

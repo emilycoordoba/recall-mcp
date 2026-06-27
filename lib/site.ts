@@ -7,6 +7,11 @@ export const SITE_URL = (
 
 export const SITE_NAME = "Recall";
 
+// Email de soporte/contacto, visible en el footer y la página de ayuda. Override
+// con NEXT_PUBLIC_SUPPORT_EMAIL si algún día se usa una casilla dedicada.
+export const SUPPORT_EMAIL =
+  process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "emilycoordoba@gmail.com";
+
 export const SITE_TAGLINE = "active recall guiado por Claude";
 
 export const SITE_DESCRIPTION =

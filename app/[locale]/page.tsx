@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LanguageToggle } from "@/components/language-toggle"
 import { Link } from "@/i18n/navigation"
-import { SITE_URL, SITE_NAME } from "@/lib/site"
+import { SITE_URL, SITE_NAME, SUPPORT_EMAIL } from "@/lib/site"
 
 export async function generateMetadata({
   params,
@@ -174,8 +174,24 @@ export default async function LandingPage({
         </div>
       </section>
 
-      <footer className="mx-auto max-w-5xl px-6 py-10 text-center flex items-center justify-center text-xs text-muted-foreground">
-        <div className="pr-1"><Logo className="opacity-70" /></div>  · {t("footerTagline")}
+      <footer className="mx-auto flex max-w-5xl flex-col items-center gap-3 px-6 py-10 text-center text-xs text-muted-foreground">
+        <div className="flex items-center justify-center">
+          <div className="pr-1"><Logo className="opacity-70" /></div>  · {t("footerTagline")}
+        </div>
+        <nav className="flex items-center gap-4">
+          <Link
+            href="/ayuda"
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {t("footerHelp")}
+          </Link>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className="underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {t("footerSupport")}
+          </a>
+        </nav>
       </footer>
     </div>
   )

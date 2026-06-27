@@ -77,7 +77,9 @@
     "ctaSecondary": "Ya tengo cuenta",
     "footerTagline": "Sistema de active recall personal",
     "tagline": "active recall guiado por Claude",
-    "metaDescription": "Active recall guiado por Claude: te explica un tema, vos hacés recall libre, y el sistema registra cuánto retenés con repetición espaciada."
+    "metaDescription": "Active recall guiado por Claude: te explica un tema, vos hacés recall libre, y el sistema registra cuánto retenés con repetición espaciada.",
+    "footerHelp": "Ayuda",
+    "footerSupport": "Soporte"
   },
   "error": {
     "title": "Algo salió mal",
@@ -308,5 +310,26 @@
     "diffSuggested": "Dificultad sugerida {level}/5 (aún sin registrar)",
     "diffCurrent": "Dificultad actual {level}/5",
     "nextSuggested": "próxima sugerida: {level}/5"
+  },
+  "help": {
+    "metaTitle": "Ayuda",
+    "metaDescription": "Preguntas frecuentes sobre Recall: active recall, conexión con Claude Desktop, privacidad y repetición espaciada.",
+    "title": "Centro de ayuda",
+    "intro": "Preguntas frecuentes sobre Recall: cómo funciona, cómo conectarlo con Claude Desktop y cómo cuidamos tus datos.",
+    "q1": "¿Qué es Recall y cómo funciona?",
+    "a1": "Recall es un sistema de active recall personal. Claude Desktop te explica un tema y luego te pide que recuerdes lo aprendido con tus propias palabras. El sistema guarda tu respuesta, la evalúa y registra tu progreso a lo largo del tiempo, programando los repasos con repetición espaciada para que estudies justo antes de olvidar.",
+    "q2": "¿Cómo conecto Claude Desktop?",
+    "a2": "Recall funciona como un servidor MCP. En Claude Desktop abrí el archivo de configuración (claude_desktop_config.json) y agregá Recall como servidor MCP con la URL del sitio terminada en /api/mcp y tu token Bearer. La página de Prompt (dentro de la app, ya con sesión) tiene las plantillas de system prompt listas para copiar. El token se obtiene al crear tu cuenta.",
+    "q3": "¿Es gratis? ¿Necesito una cuenta?",
+    "a3": "Sí, es gratis. Necesitás crear una cuenta con tu email para que el sistema pueda guardar tus temas y tu progreso de forma privada, separada del resto de usuarios.",
+    "q4": "¿Dónde se guardan mis datos?",
+    "a4": "Tus temas, recalls y progreso se guardan en una base de datos segura (Supabase) y solo vos podés verlos: cada cuenta está aislada del resto. No compartimos ni vendemos tu información.",
+    "q5": "¿Cómo funciona la repetición espaciada?",
+    "a5": "Cada vez que hacés un recall, el sistema puntúa cuánto retuviste y calcula cuándo conviene repasar ese tema (con un algoritmo tipo SM-2). Los temas que recordás bien se espacian cada vez más; los que te cuestan vuelven antes. Así estudiás menos y retenés más.",
+    "q6": "Tengo un problema o una sugerencia, ¿cómo los contacto?",
+    "a6": "Escribinos por email y te respondemos. Encontrás la dirección de contacto más abajo.",
+    "contactTitle": "¿Seguís con dudas?",
+    "contactBody": "Escribinos y te ayudamos con lo que necesites.",
+    "backToHome": "Volver al inicio"
   }
 }

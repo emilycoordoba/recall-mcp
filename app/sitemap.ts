@@ -6,6 +6,7 @@ import { routing } from "@/i18n/routing"
 // detrás de auth. Cada ruta se emite por cada locale con sus alternates hreflang.
 const PATHS = [
   { path: "", changeFrequency: "monthly" as const, priority: 1 },
+  { path: "/ayuda", changeFrequency: "monthly" as const, priority: 0.6 },
   { path: "/signup", changeFrequency: "yearly" as const, priority: 0.5 },
   { path: "/login", changeFrequency: "yearly" as const, priority: 0.3 },
 ]

@@ -53,6 +53,12 @@ export async function generateMetadata({
       title,
       description,
     },
+    // Verificación de Google Search Console: pegá el código del meta-tag en la env
+    // var GOOGLE_SITE_VERIFICATION (en Vercel) y Next emite el <meta> automáticamente.
+    // Sin la var no se renderiza nada.
+    verification: process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : undefined,
   }
 }
 
