@@ -75,7 +75,9 @@
     "ctaBody": "Creá tu cuenta, conectá Claude Desktop y dejá que el sistema lleve la cuenta de tu memoria.",
     "ctaPrimary": "Crear cuenta",
     "ctaSecondary": "Ya tengo cuenta",
-    "footerTagline": "Sistema de active recall personal"
+    "footerTagline": "Sistema de active recall personal",
+    "tagline": "active recall guiado por Claude",
+    "metaDescription": "Active recall guiado por Claude: te explica un tema, vos hacés recall libre, y el sistema registra cuánto retenés con repetición espaciada."
   },
   "error": {
     "title": "Algo salió mal",

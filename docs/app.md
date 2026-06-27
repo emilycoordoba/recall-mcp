@@ -223,14 +223,23 @@ El dashboard usa un lenguaje visual coherente ("redondeado y cálido"):
   control visible es `components/theme-toggle.tsx` (island cliente sol/luna en el
   `AppHeader`, con guard de hidratación `mounted`); además sigue el atajo `d`.
   - **Confirmaciones** con `components/confirm-dialog.tsx`: `<ConfirmProvider>`
-    (montado en `app/layout.tsx`) + hook `useConfirm()` promise-based sobre Radix
+    (montado en `app/[locale]/layout.tsx`) + hook `useConfirm()` promise-based sobre Radix
     AlertDialog. Patrón en el call site: `if (!(await confirm({ title, … }))) return`.
-- **Idioma**: toda la UI visible está en español (los términos de dominio
-  "recall"/"quick review"→"repaso rápido" y los préstamos "feedback"/"email" se
-  mantienen). El documento declara `lang="es"`.
-- **Título de pestaña / metadata**: `app/layout.tsx` define `metadata` con
-  `title.template = "%s · Recall"` y `default = "Recall"`; cada página exporta su
-  propio `title` (o `generateMetadata` con el nombre del tema en `/topics/[id]`).
+- **Idioma (i18n, next-intl v4)**: UI **bilingüe ES/EN** con ruteo por prefijo de
+  locale (`/es`, `/en`; default `es`, `localePrefix: "always"`). Config en `i18n/`
+  (`routing.ts`, `navigation.ts`, `request.ts`); catálogos en `messages/{es,en}.json`
+  (paridad total de claves, por namespace). Las páginas viven bajo `app/[locale]/`;
+  el `<html lang>` se deriva del locale en `app/[locale]/layout.tsx`. Componentes:
+  `useTranslations`/`getTranslations`; navegación con los `Link`/`useRouter` de
+  `@/i18n/navigation` (locale-aware), **no** los de `next/*`. Selector ES/EN en
+  `components/language-toggle.tsx` (cambia solo el prefijo de locale, preserva path +
+  query). Los términos de dominio en ES ("recall"/"quick review"→"repaso rápido") y
+  préstamos ("feedback"/"email") se mantienen. `/authorize` queda **fuera** de
+  `[locale]` (contrato OAuth con URL estable, layout raíz propio).
+- **Título de pestaña / metadata**: `app/[locale]/layout.tsx` define `metadata` con
+  `title.template = "%s · Recall"` y `default = "Recall"`, más `generateMetadata` por
+  locale (canonical + hreflang `es`/`en`/`x-default`, `og:locale`); cada página exporta
+  su propio `title` (o `generateMetadata` con el nombre del tema en `/topics/[id]`).
 - **Navegación**: header común `components/app-header.tsx` (`<AppHeader>`) en todas
   las páginas — marca (link al inicio) + nav (Sesiones/Historial/Prompt/Ajustes/Salir)
   + toggle de tema (`ThemeToggle`) + racha opcional. Unifica los tres patrones previos

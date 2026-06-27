@@ -75,7 +75,9 @@
     "ctaBody": "Create your account, connect Claude Desktop, and let the system keep track of your memory.",
     "ctaPrimary": "Create account",
     "ctaSecondary": "I already have an account",
-    "footerTagline": "Personal active recall system"
+    "footerTagline": "Personal active recall system",
+    "tagline": "active recall guided by Claude",
+    "metaDescription": "Active recall guided by Claude: it explains a topic, you recall it freely, and the system tracks how much you retain with spaced repetition."
   },
   "error": {
     "title": "Something went wrong",

@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server"
 import { Logo } from "@/components/logo"
 import { LogoutButton } from "@/components/logout-button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { LanguageToggle } from "@/components/language-toggle"
 import { Link } from "@/i18n/navigation"
 
 // Barra de navegación común a todas las páginas: marca (link al inicio) + nav +
@@ -38,6 +39,7 @@ export async function AppHeader({ streak = 0 }: { streak?: number }) {
           </Link>
         ))}
         <LogoutButton />
+        <LanguageToggle />
         <ThemeToggle />
       </nav>
     </header>

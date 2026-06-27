@@ -1,15 +1,41 @@
+import type { Metadata } from "next"
 import { getTranslations, setRequestLocale } from "next-intl/server"
 import { Logo, LogoMark } from "@/components/logo"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { LanguageToggle } from "@/components/language-toggle"
 import { Link } from "@/i18n/navigation"
-import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from "@/lib/site"
+import { SITE_URL, SITE_NAME } from "@/lib/site"
 
-export const metadata = {
-  title: { absolute: `${SITE_NAME} — ${SITE_TAGLINE}` },
-  description: SITE_DESCRIPTION,
-  alternates: { canonical: "/" },
-  openGraph: { url: "/", title: `${SITE_NAME} — ${SITE_TAGLINE}`, description: SITE_DESCRIPTION },
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: "landing" })
+  const title = `${SITE_NAME} — ${t("tagline")}`
+  const description = t("metaDescription")
+  return {
+    title: { absolute: title },
+    description,
+    // hreflang: anuncia ambas versiones de idioma para que un buscador sirva la
+    // correcta. x-default apunta al locale por defecto (es).
+    alternates: {
+      canonical: `/${locale}`,
+      languages: { es: "/es", en: "/en", "x-default": "/es" },
+    },
+    // openGraph en metadata anidada REEMPLAZA el del layout (no se fusiona), así
+    // que repetimos locale/type/siteName acá para no perderlos en el landing.
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: locale === "en" ? "en_US" : "es_ES",
+      url: `/${locale}`,
+      title,
+      description,
+    },
+  }
 }
 
 export default async function LandingPage({
@@ -27,7 +53,7 @@ export default async function LandingPage({
     "@type": "WebApplication",
     name: SITE_NAME,
     url: SITE_URL,
-    description: SITE_DESCRIPTION,
+    description: t("metaDescription"),
     applicationCategory: "EducationalApplication",
     operatingSystem: "Web",
     inLanguage: locale,
@@ -65,6 +91,7 @@ export default async function LandingPage({
           <Button asChild size="sm">
             <Link href="/signup">{t("navSignUp")}</Link>
           </Button>
+          <LanguageToggle />
           <ThemeToggle />
         </nav>
       </header>

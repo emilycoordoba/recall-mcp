@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Geist_Mono, Nunito_Sans } from "next/font/google"
 import { notFound } from "next/navigation"
 import { NextIntlClientProvider, hasLocale } from "next-intl"
-import { setRequestLocale } from "next-intl/server"
+import { getTranslations, setRequestLocale } from "next-intl/server"
 
 import "../globals.css"
 import { routing } from "@/i18n/routing"
@@ -10,40 +10,50 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { ConfirmProvider } from "@/components/confirm-dialog"
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from "@/lib/utils"
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, SITE_TAGLINE } from "@/lib/site"
+import { SITE_URL, SITE_NAME } from "@/lib/site"
 
-export const metadata: Metadata = {
-  // Base para resolver URLs relativas de OG/canonical a absolutas.
-  metadataBase: new URL(SITE_URL),
-  title: { default: `${SITE_NAME} — ${SITE_TAGLINE}`, template: "%s · Recall" },
-  description: SITE_DESCRIPTION,
-  applicationName: "Recall",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "Recall" },
-  keywords: [
-    "active recall",
-    "repetición espaciada",
-    "spaced repetition",
-    "SM-2",
-    "estudiar",
-    "memoria",
-    "Claude",
-    "flashcards",
-  ],
-  // OG/Twitter base; cada página completa título/descripción/url. La imagen sale
-  // de app/opengraph-image.tsx automáticamente.
-  openGraph: {
-    type: "website",
-    siteName: SITE_NAME,
-    locale: "es_ES",
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    description: SITE_DESCRIPTION,
-    url: "/",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
-    description: SITE_DESCRIPTION,
-  },
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: "landing" })
+  const title = `${SITE_NAME} — ${t("tagline")}`
+  const description = t("metaDescription")
+  return {
+    // Base para resolver URLs relativas de OG/canonical a absolutas.
+    metadataBase: new URL(SITE_URL),
+    title: { default: title, template: "%s · Recall" },
+    description,
+    applicationName: "Recall",
+    appleWebApp: { capable: true, statusBarStyle: "default", title: "Recall" },
+    keywords: [
+      "active recall",
+      "repetición espaciada",
+      "spaced repetition",
+      "SM-2",
+      "estudiar",
+      "memoria",
+      "Claude",
+      "flashcards",
+    ],
+    // OG/Twitter base; cada página completa título/descripción/url. La imagen sale
+    // de app/opengraph-image.tsx automáticamente.
+    openGraph: {
+      type: "website",
+      siteName: SITE_NAME,
+      locale: locale === "en" ? "en_US" : "es_ES",
+      title,
+      description,
+      url: `/${locale}`,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  }
 }
 
 export const viewport: Viewport = {

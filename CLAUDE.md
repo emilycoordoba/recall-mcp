@@ -79,9 +79,16 @@ lib/db-mcp.ts                  — queries de escritura a Supabase (save_recall,
 lib/db.ts                      — queries de lectura a Supabase (dashboard)
 lib/topic-kind.ts              — módulo puro compartido: kind de subsección (teoria/practica), deriveTopicKind y smScheduleSource (selección de escalera SM-2)
 lib/supabase.ts                — cliente Supabase compartido
-app/page.tsx                   — landing público (estático, sin auth)
-app/app/page.tsx               — dashboard (lista de topics; requiere sesión)
-app/topics/[id]/page.tsx       — detalle del topic (Server Component)
+i18n/routing.ts                — config i18n central (locales es/en, default es, prefijo always)
+i18n/navigation.ts             — Link/redirect/useRouter locale-aware (usar estos, no los de next/*)
+i18n/request.ts                — carga el catálogo de mensajes por request (next-intl)
+messages/{es,en}.json          — catálogos de traducción (paridad total de claves; por namespace)
+app/[locale]/layout.tsx        — layout raíz localizado: <html lang={locale}> + NextIntlClientProvider + generateMetadata
+app/[locale]/page.tsx          — landing público (estático, sin auth; bilingüe)
+app/[locale]/app/page.tsx      — dashboard (lista de topics; requiere sesión)
+app/[locale]/topics/[id]/page.tsx — detalle del topic (Server Component)
+app/authorize/                 — endpoint OAuth (FUERA de [locale], URL estable; layout raíz propio)
+components/language-toggle.tsx — selector ES/EN (island; cambia solo el prefijo de locale)
 components/dashboard-filters.tsx — lista + filtros + renombrar/fusionar/borrar + grupos por fila + selección múltiple (Client)
 components/group-editor.tsx     — GroupCombobox (sin datalist) + GroupChips reutilizables
 components/group-stat-cards.tsx — tarjetas de resumen por grupo con borrar grupo (Client)
@@ -110,14 +117,17 @@ SYSTEM_PROMPT.md · SYSTEM_PROMPT_MATE.md — plantillas de system prompt (fuent
 **Sistema visual**: lenguaje "redondeado y cálido". Radio = un solo token
 `--radius` en `globals.css` (Tailwind v4 deriva sm/md/lg); no hardcodear radios
 fijos. Feedback in-app (no `alert`/`confirm` nativos): `toast.error()`/`toast.success()`
-y `await confirm({…})` vía `useConfirm()`. UI en español (`lang="es"`). Metadata con
-`title` template "%s · Recall" en `app/layout.tsx`. **SEO**: el landing `/` es
-público e indexable; `app/layout.tsx` define `metadataBase` + OpenGraph/Twitter +
-keywords; OG image dinámica en `app/opengraph-image.tsx`; `/robots.txt` y
-`/sitemap.xml` por archivo (`app/robots.ts` / `app/sitemap.ts`); JSON-LD
-(`WebApplication`) en el landing; rutas auth-gated en `noindex` + disallow. El
-matcher del middleware **excluye** robots/sitemap/OG/manifest para que un crawler
-sin sesión no sea redirigido a `/login`. **Responsive**: lista de temas
+y `await confirm({…})` vía `useConfirm()`. **UI bilingüe (next-intl)**: ES (default)
++ EN con ruteo por prefijo (`/es`, `/en`); `<html lang>` se deriva del locale en
+`app/[locale]/layout.tsx`. Metadata con `title` template "%s · Recall" en
+`app/[locale]/layout.tsx`. **SEO**: el landing `/` es público e indexable;
+`app/[locale]/layout.tsx` define `metadataBase` + OpenGraph/Twitter + keywords y
+`generateMetadata` por locale (canonical + hreflang `es`/`en`/`x-default`,
+`og:locale`); OG image dinámica en `app/opengraph-image.tsx`; `/robots.txt` y
+`/sitemap.xml` (bilingües) por archivo (`app/robots.ts` / `app/sitemap.ts`); JSON-LD
+(`WebApplication`, `inLanguage`) en el landing; rutas auth-gated en `noindex` +
+disallow. El matcher del middleware **excluye** robots/sitemap/OG/manifest/iconos
+para que un crawler sin sesión no sea redirigido a `/login`. **Responsive**: lista de temas
 en tabla (≥md) o tarjetas (<md, `MobileTopicCard`). **PWA** instalable vía
 `app/manifest.ts` (sin offline). Modo claro/oscuro con `next-themes` (toggle en el
 header + atajo `d`). Ver `docs/app.md` → "Sistema visual".
@@ -172,6 +182,8 @@ Variables de entorno necesarias:
 
 **`/api/mcp` usa Pages API, no App Router** — el Streamable HTTP transport del MCP SDK necesita acceso al request/response crudos sin el body parser de Next.js. App Router no lo soporta bien.
 
+**Middleware: auth PRIMERO, i18n DESPUÉS (orden crítico)** — `middleware.ts` compone Supabase Auth + next-intl. Resolvemos la sesión (`getUser()`), inyectamos el `USER_HEADER` (`x-recall-user-id`) en un `new NextRequest(req, { headers })` y **recién entonces** llamamos a `handleI18nRouting(i18nReq)`. next-intl hace `new Headers(request.headers)` en su rewrite interno, así que reenvía el header nativamente al Server Component. Si se invierte el orden (i18n primero y después copiar headers sobre su response), se pisa el `x-middleware-override-headers` de next-intl y el `USER_HEADER` **se pierde** → `currentUserId()` lanza "No authenticated user on request" en el dashboard. Las cookies de refresco se capturan en `lib/supabase-middleware.ts` (`middlewareSupabase` → `applyCookies`) y se vuelcan en la response final (incluidos redirects). Las rutas `/api/*` y `/auth/*` saltan el ruteo i18n (no se localizan). El matcher debe excluir los iconos del manifest (`icon-192.png`, etc.) o un fetch sin sesión del manifest los redirige a `/login`.
+
 **Grupos muchos-a-muchos con "primario" (Track C)** — un topic puede tener varios grupos vía `topic_group_links`, pero `topics.group_id` se conserva como el grupo **primario** (lo que siguen usando el plan de repaso y stats, que filtran por primario). El conjunto multi-grupo se edita desde el dashboard y también desde el MCP: `save_topic_subsections` acepta `group_name` (primario) + `additional_groups` (extras) y el helper `linkTopicGroups` (`lib/db-mcp.ts`) escribe filas en `topic_group_links` para **todos** los grupos —incluido el primario— fijándolo si el topic no tenía. Las demás tools MCP que reciben `group_name` (p.ej. `save_recall`) siguen tocando solo el primario. Dos consecuencias:
 - **Embeds ambiguos**: al existir dos caminos FK entre `topics` y `topic_groups` (`group_id` directo y vía el join table), PostgREST falla con `PGRST201` en `topic_groups(...)`. Hay que nombrar la FK del primario: `topic_groups!topics_group_id_fkey(name)`. Los grupos completos se leen aparte (`groupsByTopic` en `lib/db.ts`), no por embed.
 - **RLS (Track D)**: `topic_group_links` tiene RLS activo con política `user_id = app_uid()`, igual que el resto del esquema. El dashboard lee/escribe con el cliente **con sesión** (`getServerSupabase`), así que `app_uid()` resuelve y las políticas dejan pasar; el MCP usa `service_role` y salta RLS. Si alguna vez una lectura sale vacía en silencio, sospechar de la sesión (sin `auth.uid()` → `app_uid()` NULL → 0 filas), no de la query.
@@ -187,6 +199,7 @@ Variables de entorno necesarias:
 - Next.js 16 App Router + Turbopack
 - shadcn/ui + Tailwind CSS v4 (Radix vía paquete unificado `radix-ui`)
 - `sonner` (toasts) + `next-themes` (modo claro/oscuro)
+- `next-intl` v4 — i18n (ES/EN) con ruteo por prefijo de locale
 - Supabase (`@supabase/supabase-js`) — lectura (`lib/db.ts`) y escritura (`lib/db-mcp.ts`)
 - `@modelcontextprotocol/sdk` + zod v4 — MCP server HTTP
 - @tabler/icons-react

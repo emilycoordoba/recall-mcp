@@ -9,13 +9,21 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
+      // Las rutas auth-gated ahora llevan prefijo de locale (/es/app, /en/app),
+      // así que bloqueamos tanto la forma con prefijo (/*/app) como la base.
       disallow: [
         "/app",
+        "/*/app",
         "/topics/",
+        "/*/topics/",
         "/settings",
+        "/*/settings",
         "/sessions",
+        "/*/sessions",
         "/history",
+        "/*/history",
         "/prompt",
+        "/*/prompt",
         "/authorize",
         "/auth/",
         "/api/",
